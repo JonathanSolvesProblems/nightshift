@@ -63,6 +63,29 @@ own stored vector. A 64-dimensional embedding is far too coarse for precision
 retrieval and entirely adequate as a high-recall funnel, which is the whole
 architectural argument.
 
+## Worked example: why depth is the whole point
+
+US 10,002,398, "System for facilitating real estate transaction". During
+prosecution a USPTO examiner applied US 8,433,650 against it as a category-X
+anticipation reference.
+
+Where does that reference sit when the corpus is ranked by similarity to the
+target?
+
+| | |
+|---|---|
+| Eligible prior art after the priority-date gate | 149,721 |
+| Rank of the reference the examiner actually used | **6,426** |
+
+A tool that ranks the corpus and shows a human the top 50 does not surface this
+reference. Neither does one that shows the top 500. It is only found by a system
+willing to actually read several thousand candidates, which is what separates a
+judgment pipeline from a retrieval pipeline.
+
+This is also why an early run of this repository returned zero hits: it screened
+only the top 250, which is well short of the measured median rank of 1,230 for
+category-X references. The fix was not a better prompt. It was screening deeper.
+
 ## Result 2: end-to-end recall
 
 **Status: not yet run.** Scheduled 2026-08-22, reported at whatever n the run
