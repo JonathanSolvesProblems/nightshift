@@ -243,15 +243,31 @@ def screen(
     resp = generate(gc, prompt, SCREEN_SCHEMA)
     data = resp.parsed or {}
     usage = resp.usage_metadata
+
     score = int(data.get("relevance", 0) or 0)
+    addressed = [normalize_label(x) for x in data.get("limitations_addressed", [])]
+
+    # Promote on evidence, not on the model's self-rating alone.
+    #
+    # The 0-3 scale is a judgment call and references sit right on the 1/2
+    # boundary, so the same reference scored 2 and then 1 across runs while
+    # consistently identifying the same three limitations. Thresholding the
+    # integer alone made the filter flap; the list of limitations it actually
+    # found a counterpart for is the more stable signal.
+    #
+    # Screening is also allowed to be generous. It decides what gets read
+    # closely, and the chart stage does the strict limitation-by-limitation
+    # work, so a false positive here costs one more call while a false negative
+    # loses the reference for good.
+    relevant = score >= 2 or len(addressed) >= 2
 
     return Verdict(
         patent_id=candidate.patent_id,
         title=candidate.title,
         filing_date=candidate.filing_date,
         relevance=score,
-        relevant=score >= 2,
-        limitations_disclosed=list(data.get("limitations_addressed", [])),
+        relevant=relevant,
+        limitations_disclosed=addressed,
         summary=data.get("summary", ""),
         tokens_in=getattr(usage, "prompt_token_count", 0) or 0,
         tokens_out=getattr(usage, "candidates_token_count", 0) or 0,

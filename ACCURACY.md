@@ -86,6 +86,27 @@ This is also why an early run of this repository returned zero hits: it screened
 only the top 250, which is well short of the measured median rank of 1,230 for
 category-X references. The fix was not a better prompt. It was screening deeper.
 
+## Model selection, measured rather than assumed
+
+Screening runs on `gemini-3.5-flash`. Two alternatives were tested against the
+same known category-X pair and rejected on evidence.
+
+| Model | Behaviour across repeated runs at temperature 0 |
+|---|---|
+| `gemini-3.5-flash` | stable, 3 of 3 runs identical |
+| `gemini-3.5-flash-lite` | **unstable**: one run found 4 limitations, the next found 0 |
+| any Pro model | not available at 3.5 or newer, so it would fail the version requirement |
+
+flash-lite costs less per token and would have cut the bill for a wide pass by a
+useful margin. It is not usable here, because instability in the screening stage
+does not degrade the recall number gracefully, it makes it meaningless: the same
+reference would be found or missed depending on which run you happened to
+measure.
+
+Vertex AI is the runtime rather than the AI Studio endpoint. The AI Studio free
+tier caps some models at 20 requests per day, which is not a limit that backoff
+can recover from when the unit of work is thousands of candidates.
+
 ## Result 2: end-to-end recall
 
 **Status: not yet run.** Scheduled 2026-08-22, reported at whatever n the run
