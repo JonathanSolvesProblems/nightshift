@@ -1,11 +1,31 @@
-"""Cloud Run service: start runs and watch them.
+"""Cloud Run service: start runs, watch them, read the result.
 
-Three routes, because a background job needs exactly three things from a UI:
-somewhere to start it, somewhere to watch it, and somewhere to read the result.
+DESIGN CODE. Read this before changing any value below.
 
-    /              start a run, list recent ones
-    /run/{id}      live funnel, worker grid, findings as they land
-    /eval          the accuracy table, with its denominator stated
+Category convention avoided: every patent and legal-tech tool (Patlytics,
+IPRally, XLSCOUT, Derwent, Anaqua) ships a white enterprise-SaaS canvas, a left
+sidebar of icon+label rows, a corporate-navy accent, dense zebra-striped Inter
+tables, and search results as white cards each carrying a coloured
+relevance-score chip. The AI-agent variant adds an indigo-to-violet gradient
+hero and a dark console tab. Adopting that look concedes the argument this tool
+is making.
+
+Metaphor: a core sample drawn from a borehole through the patent record. Depth
+is time, older art lies deeper, and the reference that matters is a seam at a
+measured depth.
+
+  - The corpus is one continuous banded column with no gaps between bands,
+    because prior art is a continuous record in time and cutting it into cards
+    would imply the entries are independent.
+  - Vertical position encodes rank and band temperature encodes filing decade,
+    because the product's whole claim is that the answer sits at a depth no
+    human search reaches, and that has to be visible rather than asserted.
+  - There is exactly one accent, reserved for a reference judged worth an
+    attorney's time, because in every run most of the column is not.
+  - Numerals are tabular and every count sits in the same column position,
+    because the funnel numbers only mean anything as a subtraction.
+
+Full spec in .design/manifest.json.
 """
 
 from __future__ import annotations
@@ -14,96 +34,278 @@ import json
 import os
 import threading
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from . import orchestrate, store
+from . import judge, orchestrate, store
 
 app = FastAPI(title="Nightshift")
 
 DEFAULT_TASKS = int(os.environ.get("PRIOR_ART_TASKS", "10"))
 DEFAULT_CANDIDATES = int(os.environ.get("PRIOR_ART_CANDIDATES", "2000"))
 
+FONTS = (
+    "https://fonts.googleapis.com/css2?"
+    "family=Instrument+Sans:wght@400;500;600&"
+    "family=Martian+Mono:wght@400;600&display=swap"
+)
+
 CSS = """
+:root{
+  --field:#262B29; --well:#1D2220; --raised:#2F3533; --hairline:#3A413E;
+  --ink:#E8EAE6; --ink2:#A8AFA9; --ink3:#6F7873;
+  --seam:#8CBF3F; --seam-ink:#1A1F18;
+  --s1:6px; --s2:12px; --s3:20px; --s4:32px; --s5:52px;
+  --settle:420ms; --ease:cubic-bezier(.22,.61,.36,1);
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --field:#D8DBD5; --well:#C6CAC3; --raised:#E4E7E1; --hairline:#B0B5AC;
+    --ink:#1F2422; --ink2:#4C5451; --ink3:#6F7873;
+    --seam:#4F7318; --seam-ink:#F2F5EE;
+  }
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0b0d10;color:#e6e9ef;font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;padding:34px 26px;max-width:1080px;margin:0 auto}
-a{color:#7fb2ff;text-decoration:none}
-h1{font-size:19px;letter-spacing:.14em;text-transform:uppercase;font-weight:600}
-h1 span{color:#5b6472}
-.sub{color:#8b95a5;font-size:13px;margin-top:6px}
-.card{background:#12151a;border:1px solid #1e232b;border-radius:9px;padding:18px;margin-top:18px}
-.funnel{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
-.stat{background:#0e1116;border:1px solid #1e232b;border-radius:7px;padding:13px}
-.stat .n{font:600 25px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#e6e9ef}
-.stat .l{color:#7d879a;font-size:11px;text-transform:uppercase;letter-spacing:.09em;margin-top:6px}
-.stat.drop .n{color:#e08a5a}
-.stat.hit .n{color:#5ad1a0}
-.grid{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
-.t{width:26px;height:26px;border-radius:4px;background:#1a1f27;border:1px solid #232935;font:600 10px/24px ui-monospace,monospace;text-align:center;color:#5b6472}
-.t.run{background:#1d3a5c;border-color:#2f5f96;color:#9dc8ff}
-.t.done{background:#1d4437;border-color:#2c6b53;color:#7fe3bb}
+body{
+  background:var(--field);color:var(--ink);
+  font:15px/1.5 "Instrument Sans",ui-sans-serif,system-ui,sans-serif;
+  padding:var(--s4) var(--s3);max-width:1140px;margin:0 auto;
+}
+a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--hairline)}
+a:hover{border-bottom-color:var(--seam)}
+.num{font-family:"Martian Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;letter-spacing:-.04em}
+
+/* masthead: a core log header, not a nav bar */
+header{border-bottom:2px solid var(--ink);padding-bottom:var(--s2);margin-bottom:var(--s3)}
+.mark{font-size:13px;letter-spacing:.34em;text-transform:uppercase;font-weight:600}
+.mark b{font-weight:600}
+.mark span{color:var(--ink3);font-weight:400}
+.sub{color:var(--ink2);font-size:13px;margin-top:var(--s1);max-width:66ch}
+
+/* the well: everything structural is milled into the field, never floated on it */
+.well{background:var(--well);border:1px solid var(--hairline);
+  box-shadow:inset 0 1px 0 rgba(0,0,0,.28);padding:var(--s3);margin-top:var(--s3)}
+.lip{border-top:1px solid var(--hairline);margin-top:var(--s3);padding-top:var(--s3)}
+h2{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink3);
+  font-weight:600;margin-bottom:var(--s2)}
+
+/* the funnel reads as a subtraction, so counts share one right-aligned column */
+.funnel{display:grid;grid-template-columns:1fr auto;gap:var(--s1) var(--s3);align-items:baseline}
+.funnel dt{color:var(--ink2);font-size:13.5px}
+.funnel dd{text-align:right;font-size:17px}
+.funnel .minus dd{color:var(--ink3)}
+.funnel .minus dd::before{content:"\\2212";margin-right:.35em;color:var(--ink3)}
+.funnel .keep{border-top:1px solid var(--hairline);padding-top:var(--s1);margin-top:var(--s1)}
+.funnel .keep dt,.funnel .keep dd{color:var(--ink);font-weight:600}
+.funnel .found dd{color:var(--seam)}
+
+/* the depth column: the one loud element on the page */
+.rig{display:grid;grid-template-columns:104px 1fr;gap:var(--s4)}
+.core{position:relative;background:var(--well);border:1px solid var(--hairline);
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.35);min-height:460px;overflow:hidden}
+.band{position:absolute;left:0;right:0}
+.drill{position:absolute;left:0;right:0;top:0;background:rgba(0,0,0,.34);
+  border-bottom:1px solid var(--seam);transition:height var(--settle) var(--ease)}
+.seam{position:absolute;left:0;right:0;height:2px;background:var(--seam);
+  opacity:.5;transition:top var(--settle) var(--ease)}
+.seam.hot{height:3px;opacity:1;box-shadow:0 0 0 1px var(--seam-ink)}
+.ruler{position:relative;min-height:460px;color:var(--ink3);font-size:10.5px}
+.tick{position:absolute;left:0;white-space:nowrap}
+.corewrap{display:grid;grid-template-columns:1fr 46px;gap:var(--s1)}
+
+/* shard tasks: witness marks, not status pills */
+.tasks{display:flex;flex-wrap:wrap;gap:3px;margin-top:var(--s2)}
+.tk{width:100%;max-width:22px;height:8px;background:var(--raised);
+  border:1px solid var(--hairline)}
+.tk.run{background:var(--ink3)}
+.tk.done{background:var(--seam);border-color:var(--seam)}
+
 table{width:100%;border-collapse:collapse;font-size:13.5px}
-th{text-align:left;color:#7d879a;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:8px 10px;border-bottom:1px solid #1e232b}
-td{padding:9px 10px;border-bottom:1px solid #161a20;vertical-align:top}
-td.mono{font-family:ui-monospace,monospace;color:#9dc8ff;white-space:nowrap}
-input,button{font:inherit}
-input[type=text]{background:#0e1116;border:1px solid #262c36;color:#e6e9ef;border-radius:7px;padding:11px 13px;width:230px}
-button{background:#2f6bd8;border:0;color:#fff;border-radius:7px;padding:11px 20px;font-weight:600;cursor:pointer}
-.note{color:#7d879a;font-size:12.5px;margin-top:10px;line-height:1.6}
-.warn{background:#1a1410;border:1px solid #3d2a18;color:#d8a878;border-radius:7px;padding:11px 13px;font-size:12.5px;margin-top:16px}
-.pill{display:inline-block;background:#1a1f27;border:1px solid #262c36;border-radius:20px;padding:2px 10px;font-size:11px;color:#8b95a5}
+th{text-align:left;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink3);font-weight:600;padding:var(--s1) var(--s2) var(--s1) 0;
+  border-bottom:1px solid var(--hairline)}
+td{padding:10px var(--s2) 10px 0;border-bottom:1px solid var(--hairline);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.n{white-space:nowrap}
+.tier{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)}
+.tier.hot{color:var(--seam)}
+
+/* controls are the only place radius appears: roundness marks interactivity */
+input[type=text]{background:var(--field);border:1px solid var(--hairline);
+  color:var(--ink);border-radius:3px;padding:11px var(--s2);width:250px;
+  font:15px "Instrument Sans",sans-serif}
+input[type=text]:focus{outline:2px solid var(--seam);outline-offset:1px}
+button{background:var(--seam);color:var(--seam-ink);border:0;border-radius:3px;
+  padding:11px var(--s3);font:600 14px "Instrument Sans",sans-serif;cursor:pointer;
+  letter-spacing:.02em}
+button:hover{filter:brightness(1.08)}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+.note{color:var(--ink3);font-size:12.5px;line-height:1.6;margin-top:var(--s2);max-width:74ch}
+.caveat{border-left:2px solid var(--ink3);padding-left:var(--s2);color:var(--ink2);
+  font-size:12.5px;margin-top:var(--s3);max-width:74ch}
+
+/* the chart is the deliverable: it is set to be read, not skimmed */
+.exhibit{background:var(--well);border:1px solid var(--hairline);margin-top:var(--s3)}
+.exhibit-head{padding:var(--s3);border-bottom:2px solid var(--ink)}
+.lim{display:grid;grid-template-columns:190px 1fr;gap:var(--s3);
+  padding:var(--s3);border-bottom:1px solid var(--hairline)}
+.lim:last-child{border-bottom:0}
+.lim-id{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);
+  font-weight:600;margin-bottom:var(--s1)}
+.lim-text{color:var(--ink2);font-size:13px;line-height:1.55}
+.quote{border-left:2px solid var(--seam);padding-left:var(--s2);font-size:13.5px;
+  line-height:1.6;margin-bottom:var(--s2)}
+.quote.absent{border-left-color:var(--ink3);color:var(--ink3);font-style:italic}
+.why{color:var(--ink2);font-size:12.5px;line-height:1.55}
+
+@media (max-width:760px){
+  .rig{grid-template-columns:1fr}
+  .core,.ruler{min-height:220px}
+  .lim{grid-template-columns:1fr;gap:var(--s2)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important;animation:none !important}
+}
 """
 
-SHELL = """<!doctype html><html><head><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>{title}</title><style>{css}</style></head><body>
-<h1>NIGHT<span>SHIFT</span></h1>
-<div class=sub>{sub}</div>
-{body}</body></html>"""
+JS = """
+const RID = "__RID__";
+const STRATA = ["#7A4A2E","#8A6440","#8E7A5C","#7E8478","#6E8A86"];
+function bandFor(y){
+  if(!y) return STRATA[2];
+  if(y < 1990) return STRATA[0];
+  if(y < 2000) return STRATA[1];
+  if(y < 2010) return STRATA[2];
+  if(y < 2020) return STRATA[3];
+  return STRATA[4];
+}
+function n(x){ return (x===0||x) ? Number(x).toLocaleString() : "\\u2014"; }
+function esc(s){ return String(s||"").replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c])); }
+
+let painted = false;
+
+async function tick(){
+  const res = await fetch("/api/run/" + RID);
+  if(!res.ok) return;
+  const d = await res.json(), run = d.run;
+  const total = run.candidates || 1;
+
+  set("corpus", run.corpus_size); set("dropped", run.dropped_not_prior_art);
+  set("family", run.dropped_same_family); set("eligible", run.eligible);
+  set("screened", run.screened); set("hot", run.strong); set("partial", run.partial);
+
+  // Strata are painted once: the corpus does not change while a run is in flight.
+  const core = document.getElementById("core");
+  if(!painted && run.strata && run.strata.length){
+    const slices = run.strata.length, h = 100 / slices;
+    core.innerHTML = run.strata.map((s,i) =>
+      `<div class="band" style="top:${(i*h).toFixed(3)}%;height:${(h+0.15).toFixed(3)}%;background:${bandFor(s.year)}"></div>`
+    ).join("") + '<div class="drill" id="drill" style="height:0%"></div>';
+    const ruler = document.getElementById("ruler");
+    ruler.innerHTML = [0,.25,.5,.75,1].map(f =>
+      `<div class="tick" style="top:calc(${(f*100).toFixed(0)}% - 6px)">${f===1?"":"\\u2500 "}${n(Math.round(f*total))}</div>`
+    ).join("");
+    painted = true;
+  }
+
+  const drill = document.getElementById("drill");
+  if(drill) drill.style.height = Math.min(100, (run.screened/total)*100).toFixed(2) + "%";
+
+  // A seam sits at the depth its rank actually occupies.
+  core.querySelectorAll(".seam").forEach(e => e.remove());
+  (d.findings||[]).forEach(f => {
+    const el = document.createElement("div");
+    el.className = "seam" + ((f.relevance||0) >= 2 ? " hot" : "");
+    el.style.top = Math.min(99.6, ((f.rank||0)/total)*100).toFixed(2) + "%";
+    core.appendChild(el);
+  });
+
+  const done = d.shards.filter(s => s.status === "done").length;
+  document.getElementById("tasks").innerHTML = d.shards.map(s =>
+    `<div class="tk ${s.status==="done"?"done":"run"}" title="task ${s.index}: ${s.screened}/${s.assigned}"></div>`
+  ).join("");
+  document.getElementById("status").textContent =
+    run.status === "queued" ? "waiting for Cloud Run to provision tasks"
+    : done + " of " + (d.shards.length || run.tasks || 0) + " Cloud Run tasks finished";
+
+  document.getElementById("rows").innerHTML = (d.findings||[]).map(f =>
+    `<tr><td class="n num">${n(f.rank)}</td>`+
+    `<td class="n num">US ${esc(f.patent_id)}</td>`+
+    `<td class="n num">${esc((f.filing_date||"").slice(0,4))}</td>`+
+    `<td><span class="tier ${(f.relevance||0)>=2?"hot":""}">${(f.relevance||0)>=2?"worth reading":"partial"}</span></td>`+
+    `<td class="n num">${n((f.limitations_disclosed||[]).length)}</td>`+
+    `<td>${esc((f.summary||"").slice(0,150))}</td></tr>`
+  ).join("");
+
+  const chart = document.getElementById("chartlink");
+  if(chart) chart.style.display = (run.strong > 0) ? "inline" : "none";
+}
+function set(id,v){ const e = document.getElementById(id); if(e) e.textContent = n(v); }
+tick(); setInterval(tick, 2000);
+"""
 
 
-def page(title: str, sub: str, body: str) -> HTMLResponse:
-    return HTMLResponse(SHELL.format(title=title, css=CSS, sub=sub, body=body))
+def shell(title: str, sub: str, body: str, script: str = "") -> HTMLResponse:
+    return HTMLResponse(
+        "<!doctype html><html lang=en><head><meta charset=utf-8>"
+        '<meta name=viewport content="width=device-width,initial-scale=1">'
+        f"<title>{title}</title>"
+        f'<link rel=preconnect href="https://fonts.gstatic.com" crossorigin>'
+        f'<link rel=stylesheet href="{FONTS}">'
+        f"<style>{CSS}</style></head><body>"
+        '<header><div class=mark><b>NIGHTSHIFT</b> <span>&#183; prior-art core log</span></div>'
+        f"<div class=sub>{sub}</div></header>"
+        f"{body}"
+        + (f"<script>{script}</script>" if script else "")
+        + "</body></html>"
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    rows = ""
-    for r in store.recent_runs(12):
-        rid = r.get("run_id", "")
-        rows += (
-            f"<tr><td class=mono><a href='/run/{rid}'>{rid}</a></td>"
-            f"<td>{(r.get('title') or '')[:58]}</td>"
-            f"<td class=mono>{r.get('status','')}</td>"
-            f"<td class=mono>{r.get('findings',0)}</td></tr>"
-        )
+    rows = "".join(
+        f"<tr><td class='n num'><a href='/run/{r.get('run_id','')}'>"
+        f"{r.get('run_id','')}</a></td>"
+        f"<td>{(r.get('title') or '')[:52]}</td>"
+        f"<td class='n num'>{r.get('candidates',0):,}</td>"
+        f"<td class=n>{r.get('status','')}</td></tr>"
+        for r in store.recent_runs(10)
+    )
     table = (
-        f"<table><tr><th>run</th><th>patent</th><th>status</th><th>findings</th></tr>{rows}</table>"
+        "<table><tr><th>run</th><th>patent</th><th>read</th><th>state</th></tr>"
+        f"{rows}</table>"
         if rows
         else "<div class=note>No runs yet.</div>"
     )
 
-    return page(
+    return shell(
         "Nightshift",
-        "Prior-art evidence for a patent demand letter",
+        "A non-practicing entity sent you a demand letter. Nightshift reads the "
+        "patent record overnight and hands your attorney the prior art that "
+        "answers it.",
         f"""
-<div class=card>
+<div class=well>
   <form method=post action=/run>
-    <input type=text name=patent placeholder="Patent number, e.g. 10002398" required>
-    <button type=submit>Run overnight</button>
+    <input type=text name=patent placeholder="Asserted patent number" required
+           aria-label="Asserted patent number">
+    <button type=submit>Sink a borehole</button>
   </form>
   <div class=note>
-    Nightshift ranks every US patent in CPC G06Q that predates this patent's
-    priority date, then has Gemini read the top {DEFAULT_CANDIDATES:,} of them
-    against each limitation of claim 1. It runs as a background job across
-    {DEFAULT_TASKS} Cloud Run tasks. Close the tab; the run continues.
+    Every US patent in CPC G06Q that predates this patent's priority date is
+    ranked, and Gemini reads the top {DEFAULT_CANDIDATES:,} of them against every
+    limitation of claim 1. The work runs across {DEFAULT_TASKS} Cloud Run tasks.
+    Close the tab; the run continues without you.
   </div>
 </div>
-<div class=card><h1 style="font-size:13px">Recent runs</h1><div style="margin-top:12px">{table}</div></div>
-<div class=warn>Prior-art evidence dossier, not a legal opinion. Nightshift reports
-what a reference discloses. It does not decide whether a claim is invalid.
-Prepared for review by licensed patent counsel.</div>
-<div class=note><a href=/eval>Accuracy and how it was measured</a></div>
+<div class=well><h2>Recent boreholes</h2>{table}</div>
+<div class=caveat>
+  Prior-art evidence dossier, not a legal opinion. Nightshift reports what a
+  reference discloses. It does not decide whether a claim is invalid, and its
+  output is prepared for review by licensed patent counsel.
+</div>
+<div class=note><a href=/eval>How accurate is it, and measured against what</a></div>
 """,
     )
 
@@ -112,8 +314,6 @@ Prepared for review by licensed patent counsel.</div>
 def start(patent: str = Form(...)):
     pid = "".join(ch for ch in patent if ch.isdigit())
     run_id = orchestrate.prepare(pid, DEFAULT_CANDIDATES)
-    # Launch off the request thread so the browser is not held open waiting on
-    # the Cloud Run Jobs API.
     threading.Thread(
         target=orchestrate.launch, args=(run_id, DEFAULT_TASKS), daemon=True
     ).start()
@@ -126,78 +326,205 @@ def api_run(run_id: str):
     if not run:
         return JSONResponse({"error": "not found"}, status_code=404)
     shards = store.list_shards(run_id)
-    # Tier counts are computed over every finding in the run; only the display
-    # list is truncated.
     all_findings = store.list_findings(run_id)
-    findings = all_findings[:60]
     run["screened"] = sum(s.get("screened", 0) for s in shards)
     run["findings"] = len(all_findings)
-    # Two tiers, reported separately.
-    #
-    # Screening is deliberately generous: it decides what gets read closely, so a
-    # false positive costs one more call while a false negative loses the
-    # reference for good. That means the raw flagged count overstates what is
-    # worth an attorney's time. Relevance 2 and above is "addresses part of the
-    # claimed approach"; relevance 1 is "same field, does not address it".
+    # Two tiers, counted over the whole run and truncated only for display.
+    # Screening is deliberately generous because it decides what gets read
+    # closely, so the raw flagged count overstates what is worth an attorney's
+    # time. Relevance 2+ addresses part of the claimed approach; 1 is same field.
     run["strong"] = sum(1 for f in all_findings if (f.get("relevance") or 0) >= 2)
     run["partial"] = run["findings"] - run["strong"]
-    return JSONResponse({"run": run, "shards": shards, "findings": findings})
+    return JSONResponse({"run": run, "shards": shards, "findings": all_findings[:80]})
 
 
 @app.get("/run/{run_id}", response_class=HTMLResponse)
-def run_page(run_id: str, request: Request):
+def run_page(run_id: str):
     run = store.get_run(run_id)
     if not run:
-        return page("Not found", run_id, "<div class=card>No such run.</div>")
+        return shell("Not found", run_id, "<div class=well>No such borehole.</div>")
 
-    return page(
-        f"Run {run_id}",
-        f"US {run.get('target')} &mdash; {run.get('title','')}",
-        f"""
-<div class=card>
-  <div class=funnel>
-    <div class=stat><div class=n id=corpus>0</div><div class=l>corpus</div></div>
-    <div class="stat drop"><div class=n id=dropped>0</div><div class=l>not prior art</div></div>
-    <div class=stat><div class=n id=eligible>0</div><div class=l>eligible</div></div>
-    <div class=stat><div class=n id=screened>0</div><div class=l>read by Gemini</div></div>
-    <div class="stat hit"><div class=n id=found>0</div><div class=l>worth reading</div></div>
-    <div class=stat><div class=n id=partial>0</div><div class=l>partial overlap</div></div>
+    return shell(
+        f"US {run.get('target')} core log",
+        f"US {run.get('target')} &#183; {run.get('title','')} &#183; "
+        f"priority {run.get('priority_date','')}",
+        """
+<div class=well>
+  <div class=rig>
+    <div>
+      <h2>Depth</h2>
+      <div class=corewrap>
+        <div class=core id=core></div>
+        <div class=ruler id=ruler></div>
+      </div>
+    </div>
+    <div>
+      <h2>Cut</h2>
+      <dl class=funnel>
+        <dt>in CPC G06Q</dt><dd class=num id=corpus>&mdash;</dd>
+        <div></div><div></div>
+        <dt class=minus>filed after the priority date</dt>
+        <dd class="num minus" id=dropped>&mdash;</dd>
+        <dt class=minus>same disclosure family</dt>
+        <dd class="num minus" id=family>&mdash;</dd>
+        <dt class=keep>eligible as prior art</dt><dd class="num keep" id=eligible>&mdash;</dd>
+        <dt>read by Gemini</dt><dd class=num id=screened>&mdash;</dd>
+        <dt class=found>worth reading</dt><dd class="num found" id=hot>&mdash;</dd>
+        <dt>partial overlap</dt><dd class=num id=partial>&mdash;</dd>
+      </dl>
+      <div class=lip>
+        <h2>Cloud Run tasks</h2>
+        <div class=tasks id=tasks></div>
+        <div class=note id=status>starting</div>
+        <div class=note><a id=chartlink href="/chart/__RID__" style="display:none">
+        Draw the claim chart for the deepest strong reference</a></div>
+      </div>
+    </div>
   </div>
-  <div class=grid id=grid></div>
-  <div class=note id=status>starting</div>
 </div>
-<div class=card>
-  <h1 style="font-size:13px">Findings</h1>
-  <div style="margin-top:12px"><table id=ft>
-    <tr><th>patent</th><th>filed</th><th>tier</th><th>limitations</th><th>what it discloses</th></tr>
-  </table></div>
+<div class=well>
+  <h2>Seams</h2>
+  <table><thead><tr><th>depth</th><th>reference</th><th>filed</th><th>tier</th>
+  <th>lims</th><th>what it discloses</th></tr></thead>
+  <tbody id=rows></tbody></table>
 </div>
-<script>
-const rid={run_id!r};
-function n(x){{return (x||0).toLocaleString()}}
-async function tick(){{
-  const r = await fetch('/api/run/'+rid); if(!r.ok) return;
-  const d = await r.json(); const run=d.run;
-  corpus.textContent=n(run.corpus_size);
-  dropped.textContent=n(run.dropped_not_prior_art);
-  eligible.textContent=n(run.eligible);
-  screened.textContent=n(run.screened);
-  found.textContent=n(run.strong);
-  partial.textContent=n(run.partial);
-  grid.innerHTML = d.shards.map(s=>
-    `<div class="t ${{s.status==='done'?'done':'run'}}" title="${{s.screened}}/${{s.assigned}}">${{s.index}}</div>`).join('');
-  const done=d.shards.filter(s=>s.status==='done').length;
-  status.textContent = run.status==='queued' ? 'queued'
-    : `${{done}} of ${{d.shards.length||run.tasks||0}} Cloud Run tasks finished`;
-  ft.innerHTML = '<tr><th>patent</th><th>filed</th><th>tier</th><th>limitations</th><th>what it discloses</th></tr>' +
-    d.findings.map(f=>`<tr><td class=mono>US ${{f.patent_id}}</td><td class=mono>${{(f.filing_date||'').slice(0,10)}}</td>`+
-    `<td><span class=pill>${{(f.relevance||0)>=2?'worth reading':'partial'}}</span></td>`+
-    `<td><span class=pill>${{(f.limitations_disclosed||[]).length}}</span></td>`+
-    `<td>${{(f.summary||'').slice(0,175)}}</td></tr>`).join('');
-}}
-tick(); setInterval(tick, 2000);
-</script>
+""".replace("__RID__", run_id),
+        JS.replace("__RID__", run_id),
+    )
+
+
+@app.get("/chart/{run_id}", response_class=HTMLResponse)
+def chart_page(run_id: str):
+    """The deliverable: one reference mapped limitation by limitation.
+
+    Charting is computed on demand and cached, because it reads far more text per
+    reference than screening does and only makes sense for references screening
+    actually surfaced.
+    """
+    run = store.get_run(run_id)
+    if not run:
+        return shell("Not found", run_id, "<div class=well>No such borehole.</div>")
+
+    cached = run.get("chart")
+    if not cached:
+        findings = [f for f in store.list_findings(run_id) if (f.get("relevance") or 0) >= 2]
+        if not findings:
+            return shell(
+                "No chart yet",
+                run_id,
+                "<div class=well><div class=note>No reference has cleared the "
+                "'worth reading' tier yet. The chart is drawn from those only.</div></div>",
+            )
+        target = findings[0]
+        limitations = [
+            judge.Limitation(index=l["index"], text=l["text"])
+            for l in run.get("limitations", [])
+        ]
+        cand = _candidate_for(run_id, target["patent_id"])
+        mappings = judge.chart(cand, limitations, judge.client())
+        cached = {
+            "patent_id": target["patent_id"],
+            "title": target.get("title", ""),
+            "filing_date": target.get("filing_date", ""),
+            "rank": target.get("rank", 0),
+            "mappings": [
+                {
+                    "limitation": m.limitation,
+                    "discloses": m.discloses,
+                    "mapped_text": m.mapped_text,
+                    "reasoning": m.reasoning,
+                }
+                for m in mappings
+            ],
+        }
+        store.update_run(run_id, chart=cached)
+
+    lim_text = {l["index"]: l["text"] for l in run.get("limitations", [])}
+    rows = ""
+    for m in cached["mappings"]:
+        lid = m["limitation"]
+        body = (
+            f'<div class="quote">{_esc(m["mapped_text"])}</div>'
+            if m["discloses"] and m["mapped_text"]
+            else '<div class="quote absent">Not disclosed by this reference.</div>'
+        )
+        rows += (
+            f'<div class=lim><div><div class=lim-id>{_esc(lid)}</div>'
+            f'<div class=lim-text>{_esc(lim_text.get(lid, ""))}</div></div>'
+            f'<div>{body}<div class=why>{_esc(m["reasoning"])}</div></div></div>'
+        )
+
+    disclosed = sum(1 for m in cached["mappings"] if m["discloses"])
+    total = len(cached["mappings"])
+
+    return shell(
+        f"Claim chart US {cached['patent_id']}",
+        f"US {run.get('target')} claim 1, mapped against US {cached['patent_id']}",
+        f"""
+<div class=exhibit>
+  <div class=exhibit-head>
+    <h2>Prior-art evidence dossier</h2>
+    <div style="font-size:19px;margin-bottom:6px">US {cached['patent_id']}
+      &#183; <span class=num>{_esc(str(cached.get('filing_date',''))[:10])}</span></div>
+    <div class=lim-text>{_esc(cached.get('title',''))}</div>
+    <div class=note>
+      Surfaced at depth <span class=num>{cached.get('rank',0):,}</span> of
+      <span class=num>{run.get('eligible',0):,}</span> eligible references.
+      <span class=num>{disclosed}</span> of <span class=num>{total}</span>
+      limitations have a counterpart in this reference.
+    </div>
+  </div>
+  {rows}
+</div>
+<div class=caveat>
+  Not a legal opinion and not a validity determination. Each row states what this
+  reference discloses, quoted from the reference itself. Whether the asserted
+  claim is invalid is a question for licensed patent counsel and, ultimately, for
+  a court or the Patent Trial and Appeal Board.
+</div>
+<div class=note><a href="/run/{run_id}">Back to the core log</a></div>
 """,
+    )
+
+
+def _candidate_for(run_id: str, patent_id: str):
+    """Re-read one candidate's disclosure from the run's own table."""
+    from dataclasses import dataclass
+
+    from google.cloud import bigquery
+
+    from . import config
+
+    @dataclass
+    class C:
+        patent_id: str
+        title: str
+        filing_date: str
+        disclosure: str
+
+    client = bigquery.Client(project=config.PROJECT_ID, location=config.LOCATION)
+    sql = f"""
+    SELECT patent_id, title, filing_date, disclosure
+    FROM `{config.working_table(f"run_{run_id}")}`
+    WHERE patent_id = @pid
+    """
+    rows = list(
+        client.query(
+            sql,
+            job_config=bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("pid", "STRING", patent_id)
+                ]
+            ),
+        ).result()
+    )
+    r = rows[0]
+    return C(r["patent_id"], r["title"] or "", str(r["filing_date"]), r["disclosure"] or "")
+
+
+def _esc(s) -> str:
+    return (
+        str(s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     )
 
 
@@ -207,42 +534,48 @@ def eval_page():
     try:
         with open(os.path.abspath(path), encoding="utf-8") as fh:
             data = json.load(fh)
-        rows = ""
         label = {
-            "X": "X &mdash; examiner applied as anticipation (&sect;102)",
-            "Y": "Y &mdash; examiner applied as obviousness (&sect;103)",
-            "CONTROL": "control &mdash; never cited by the examiner",
+            "X": "examiner applied it to anticipate (&sect;102)",
+            "Y": "examiner applied it for obviousness (&sect;103)",
+            "CONTROL": "examiner never cited it",
         }
-        for cat in ("X", "Y", "CONTROL"):
-            v = data["by_category"].get(cat)
-            if v:
-                rows += (
-                    f"<tr><td>{label[cat]}</td><td class=mono>{v['n']}</td>"
-                    f"<td class=mono>{v['found_rate']}%</td></tr>"
-                )
-        table = f"<table><tr><th>set</th><th>n</th><th>flagged</th></tr>{rows}</table>"
+        rows = "".join(
+            f"<tr><td>{label[c]}</td><td class='n num'>{data['by_category'][c]['n']}</td>"
+            f"<td class='n num'>{data['by_category'][c]['found_rate']}%</td></tr>"
+            for c in ("X", "Y", "CONTROL")
+            if c in data["by_category"]
+        )
+        table = (
+            "<table><tr><th>reference set</th><th>n</th><th>found</th></tr>"
+            f"{rows}</table>"
+        )
     except FileNotFoundError:
-        table = "<div class=note>eval/screening.json not present in this image.</div>"
+        table = "<div class=note>eval/screening.json is not present in this image.</div>"
 
-    return page(
+    return shell(
         "Accuracy",
-        "Graded against references USPTO examiners actually applied",
+        "Graded against references USPTO examiners actually applied in rejections",
         f"""
-<div class=card>{table}
+<div class=well><h2>Blinded screening accuracy</h2>{table}
 <div class=note>
-Blinded: the model never saw the reference's patent number, title, assignee or
-dates. The control is the number that makes the other two mean anything, since
-recall alone is trivially gained by flagging everything. Controls are drawn from
-the same corpus and the same CPC class and pass the same priority-date gate.
+  The model never saw the reference's patent number, title, assignee or dates, so
+  it could not lean on anything it may have memorised. The control row is what
+  makes the other two mean anything: recall alone is trivially gained by flagging
+  everything, so the same screener was run over references the examiner did not
+  cite, drawn from the same corpus and passing the same priority-date gate.
 </div></div>
-<div class=card><div class=note>
-<b>Scope, stated in full.</b> The denominator is examiner-applied references that
-are granted US patents inside the 171,695-patent corpus. 73% of examiner
-citations point at pre-grant publications and 6% at non-patent literature; both
-are outside this corpus and excluded from numerator and denominator alike.
-This is recall against the examiner, not against ground truth: an examiner's own
-search runs 45 to 85% recall, so every reference Nightshift finds that the
-examiner missed is scored here as a miss. The number is a floor.
+<div class=well><h2>Scope, stated in full</h2>
+<div class=note>
+  The denominator is examiner-applied references that are granted US patents
+  inside the 171,695-patent corpus. 73% of examiner citations point at pre-grant
+  publications and 6% at non-patent literature; both sit outside this corpus and
+  are excluded from numerator and denominator alike.
+</div>
+<div class=note>
+  This is recall against the examiner, not against ground truth. An examiner's
+  own search runs 45 to 85% recall, so every reference Nightshift finds that the
+  examiner missed is scored here as a miss. The number is a floor, not an
+  estimate.
 </div></div>
 <div class=note><a href="/">Back</a></div>
 """,

@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from google.cloud import bigquery
 
@@ -32,10 +32,11 @@ class ShardCandidate:
     title: str
     filing_date: str
     disclosure: str
+    rank: int = 0
 
 
 SHARD_SQL = """
-SELECT patent_id, title, filing_date, disclosure
+SELECT patent_id, title, filing_date, disclosure, rank
 FROM `{table}`
 WHERE MOD(rank, @task_count) = @task_index
 ORDER BY rank
@@ -60,6 +61,7 @@ def load_shard(run_id: str, index: int, count: int) -> list[ShardCandidate]:
             title=r["title"] or "",
             filing_date=str(r["filing_date"]),
             disclosure=r["disclosure"] or "",
+            rank=int(r["rank"]),
         )
         for r in job.result()
     ]
@@ -97,6 +99,12 @@ def main() -> int:
     tokens_out = 0
     started = time.time()
 
+    # Depth position in the UI encodes rank, so the rank has to travel with the
+    # verdict. The screening call itself never sees it: a candidate's position in
+    # the ranking must not influence the judgment of what it discloses.
+    rank_by_id = {c.patent_id: c.rank for c in candidates}
+    date_by_id = {c.patent_id: c.filing_date for c in candidates}
+
     def on_result(v: judge.Verdict) -> None:
         nonlocal screened, findings, tokens_in, tokens_out
         screened += 1
@@ -104,7 +112,10 @@ def main() -> int:
         tokens_out += v.tokens_out
         if v.relevant:
             findings += 1
-            store.add_finding(run_id, v)
+            record = asdict(v)
+            record["rank"] = rank_by_id.get(v.patent_id, 0)
+            record["filing_date"] = date_by_id.get(v.patent_id, v.filing_date)
+            store.add_finding(run_id, record)
         # Firestore writes are not free, so progress is flushed in batches while
         # findings are written immediately.
         if screened % 25 == 0 or screened == len(candidates):

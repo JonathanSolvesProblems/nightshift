@@ -1,0 +1,102 @@
+{
+  "project": "nightshift",
+  "date": "2026-08-25",
+  "platform": "web-app",
+  "family": "dimensional-tactile",
+  "metaphor": "a core sample drawn from a borehole through the patent record: depth is time, older art lies deeper, and the killing reference is a seam at a measured depth",
+  "register": "grave",
+  "category_convention_avoided": "Patent and legal-tech tools (Patlytics, IPRally, XLSCOUT, Derwent, Anaqua) all ship a white enterprise-SaaS canvas, a left sidebar of icon+label rows, a corporate-navy accent, dense zebra-striped Inter tables, and search results as white cards each carrying a coloured relevance-score chip. The AI-agent variant of the same product adds an indigo-to-violet gradient hero and a dark console tab.",
+
+  "design_code": [
+    "The corpus is drawn as one continuous banded column with no gaps between bands, because prior art is a continuous record in time and cutting it into cards would imply the entries are independent.",
+    "Vertical position encodes rank and band temperature encodes filing decade, because the product's entire claim is that the answer sits at a depth no human search reaches, and that has to be visible rather than asserted.",
+    "There is exactly one accent and it is reserved for a reference the model judged worth an attorney's time, because in every run the overwhelming majority of the column is not.",
+    "Numerals are tabular and every count sits in the same column position, because the funnel numbers only mean anything as a subtraction: 171,723 becomes 12,856 becomes 26."
+  ],
+
+  "anti_brief": [
+    "Wrong: a white enterprise-SaaS canvas. It is the exact look of every incumbent this tool argues against, and adopting it concedes the argument.",
+    "Wrong: a red/amber/green relevance chip. It implies a calibrated probability the system does not have, and it is the incumbent convention.",
+    "Wrong: decorative motion such as fade-up-on-scroll. The only motion that earns a place here is descent, because descent is the argument."
+  ],
+
+  "expressive_axis": "structure. The core column is the one loud element; everything else is restrained so the column reads as the subject rather than as a widget.",
+
+  "canvas": {
+    "posture": "mid-dark mineral, wet slate",
+    "reason": "Near-black is consumed by prior projects and reads as a monitor; light stock is print territory and is barred. A core is read at arm's length against unlit rock, so the field is a mid-dark mineral grey-green rather than a screen black."
+  },
+
+  "palette": {
+    "dark": {
+      "field": "#262B29",
+      "well": "#1D2220",
+      "raised": "#2F3533",
+      "hairline": "#3A413E",
+      "ink": "#E8EAE6",
+      "ink_secondary": "#A8AFA9",
+      "ink_tertiary": "#6F7873",
+      "accent": "#8CBF3F",
+      "accent_hue_deg": 84,
+      "accent_ink": "#1A1F18"
+    },
+    "light": {
+      "field": "#D8DBD5",
+      "well": "#C6CAC3",
+      "raised": "#E4E7E1",
+      "hairline": "#B0B5AC",
+      "ink": "#1F2422",
+      "ink_secondary": "#4C5451",
+      "ink_tertiary": "#6F7873",
+      "accent": "#4F7318",
+      "accent_hue_deg": 84,
+      "accent_ink": "#F2F5EE"
+    },
+    "strata": {
+      "reason": "Band temperature encodes filing decade: warm and rusted is old, cool and slate is recent. Earth tones appear only as DATA inside the column, never as the dominant canvas, because warm-neutral canvases were previously rejected by this user as drab.",
+      "ramp": [
+        { "era": "pre-1990", "hex": "#7A4A2E" },
+        { "era": "1990s", "hex": "#8A6440" },
+        { "era": "2000s", "hex": "#8E7A5C" },
+        { "era": "2010s", "hex": "#7E8478" },
+        { "era": "2020s", "hex": "#6E8A86" }
+      ]
+    },
+    "chroma_budget": "monochrome mineral neutrals, plus one accent reserved for a single job, plus a five-step strata ramp used only for data encoding"
+  },
+
+  "type": {
+    "voice": "humanist sans with a slightly condensed, technical cast, set alongside a wide mono for figures so numbers read as measurements taken rather than values styled",
+    "display": "Instrument Sans",
+    "body": "Instrument Sans",
+    "figure": "Martian Mono",
+    "figure_feature": "tabular, tnum on every count",
+    "fallback": "ui-sans-serif, system-ui, sans-serif / ui-monospace, monospace",
+    "scale_ratio": 1.25,
+    "base_px": 15
+  },
+
+  "structure": "canvas-spatial: a fixed depth column on one side, a reading rail on the other. Not cards, not console panels, not a sidebar of icon rows.",
+  "density": "functional",
+  "edge": {
+    "language": "square for structural elements, 3px only on interactive controls",
+    "reason": "A core sample has no rounded corners. Radius appears only where a finger or cursor acts, so roundness marks interactivity rather than decorating containers."
+  },
+  "depth": {
+    "model": "layered-material",
+    "detail": "The column is milled into the field with an inset well and a hairline lip; findings lift out of the column on a real offset. No blurred drop shadows used as elevation-for-its-own-sake."
+  },
+  "ornament": "the data itself: the strata column, the depth ruler, and the seam marks are the only decoration",
+  "motion": {
+    "posture": "physical",
+    "signature": "descent. The column fills downward as Cloud Run shards report, and a seam settles into place at its measured depth when a finding lands.",
+    "resting": "fully static once the run completes",
+    "durations": { "settle": "420ms", "descent": "900ms" },
+    "easing": "cubic-bezier(.22,.61,.36,1)",
+    "reduced_motion": "bands and seams appear at final position with no descent or settle"
+  },
+  "numerals": {
+    "treatment": "tabular, aligned right in a fixed column, thousands separated",
+    "zero": "a zero count is rendered as a dash so absence is distinguishable from a measured zero"
+  }
+}

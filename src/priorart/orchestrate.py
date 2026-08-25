@@ -89,6 +89,28 @@ def prepare(target_id: str, n_candidates: int, scope: str = "G06Q") -> str:
     )
     c0 = list(counts_job.result())[0]
 
+    # Strata for the depth column: the candidate window cut into fixed slices,
+    # each carrying the median filing year of the candidates at that depth. The
+    # column's banding is therefore real data about the corpus rather than
+    # decoration, and it shows what a searcher actually experiences, which is
+    # that ranking by similarity does not sort by age.
+    strata_sql = f"""
+    SELECT
+      DIV(rank, GREATEST(1, DIV(@topn, 64))) AS slice,
+      CAST(APPROX_QUANTILES(CAST(SUBSTR(filing_date, 1, 4) AS INT64), 2)[OFFSET(1)]
+           AS INT64) AS year
+    FROM `{dest}`
+    GROUP BY slice
+    ORDER BY slice
+    """
+    strata = [
+        {"slice": int(r["slice"]), "year": int(r["year"] or 0)}
+        for r in client.query(
+            strata_sql,
+            job_config=bigquery.QueryJobConfig(query_parameters=params),
+        ).result()
+    ]
+
     store.create_run(
         run_id,
         target_id,
@@ -106,6 +128,7 @@ def prepare(target_id: str, n_candidates: int, scope: str = "G06Q") -> str:
             - c0["dropped_same_family"],
             "candidates": n_candidates,
             "model": judge.MODEL,
+            "strata": strata,
         },
     )
     return run_id
