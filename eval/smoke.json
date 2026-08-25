@@ -1,0 +1,156 @@
+{
+  "generated": "2026-08-25 05:44:09",
+  "model": "gemini-3.5-flash",
+  "blinded": true,
+  "seed": "nightshift-2026-08-25",
+  "by_category": {
+    "CONTROL": {
+      "n": 6,
+      "found_rate": 33.3
+    },
+    "X": {
+      "n": 6,
+      "found_rate": 100.0
+    }
+  },
+  "cost": {
+    "tokens_in": 24801,
+    "tokens_out": 1429,
+    "usd": 0.05,
+    "seconds": 85.9
+  },
+  "results": [
+    {
+      "target": "10332050",
+      "ref": "4700295",
+      "cat": "X",
+      "is_gold": true,
+      "found": true,
+      "relevance": 3,
+      "n_limitations": 2,
+      "tokens_in": 757,
+      "tokens_out": 90
+    },
+    {
+      "target": "10269015",
+      "ref": "7752146",
+      "cat": "CONTROL",
+      "is_gold": false,
+      "found": false,
+      "relevance": 0,
+      "n_limitations": 0,
+      "tokens_in": 2950,
+      "tokens_out": 70
+    },
+    {
+      "target": "10380610",
+      "ref": "8538826",
+      "cat": "CONTROL",
+      "is_gold": false,
+      "found": true,
+      "relevance": 0,
+      "n_limitations": 2,
+      "tokens_in": 1900,
+      "tokens_out": 102
+    },
+    {
+      "target": "10269015",
+      "ref": "7734527",
+      "cat": "X",
+      "is_gold": true,
+      "found": true,
+      "relevance": 3,
+      "n_limitations": 5,
+      "tokens_in": 3097,
+      "tokens_out": 164
+    },
+    {
+      "target": "10332119",
+      "ref": "8538826",
+      "cat": "CONTROL",
+      "is_gold": false,
+      "found": false,
+      "relevance": 0,
+      "n_limitations": 0,
+      "tokens_in": 1887,
+      "tokens_out": 73
+    },
+    {
+      "target": "10089602",
+      "ref": "7970667",
+      "cat": "X",
+      "is_gold": true,
+      "found": true,
+      "relevance": 2,
+      "n_limitations": 5,
+      "tokens_in": 1827,
+      "tokens_out": 186
+    },
+    {
+      "target": "10332119",
+      "ref": "7676432",
+      "cat": "X",
+      "is_gold": true,
+      "found": true,
+      "relevance": 2,
+      "n_limitations": 4,
+      "tokens_in": 1257,
+      "tokens_out": 154
+    },
+    {
+      "target": "10380610",
+      "ref": "8676875",
+      "cat": "X",
+      "is_gold": true,
+      "found": true,
+      "relevance": 2,
+      "n_limitations": 5,
+      "tokens_in": 2937,
+      "tokens_out": 174
+    },
+    {
+      "target": "10387899",
+      "ref": "9317829",
+      "cat": "X",
+      "is_gold": true,
+      "found": true,
+      "relevance": 2,
+      "n_limitations": 5,
+      "tokens_in": 2982,
+      "tokens_out": 145
+    },
+    {
+      "target": "10332050",
+      "ref": "8538826",
+      "cat": "CONTROL",
+      "is_gold": false,
+      "found": true,
+      "relevance": 3,
+      "n_limitations": 2,
+      "tokens_in": 1594,
+      "tokens_out": 91
+    },
+    {
+      "target": "10387899",
+      "ref": "8538826",
+      "cat": "CONTROL",
+      "is_gold": false,
+      "found": false,
+      "relevance": 0,
+      "n_limitations": 0,
+      "tokens_in": 1832,
+      "tokens_out": 91
+    },
+    {
+      "target": "10089602",
+      "ref": "8538826",
+      "cat": "CONTROL",
+      "is_gold": false,
+      "found": false,
+      "relevance": 0,
+      "n_limitations": 0,
+      "tokens_in": 1781,
+      "tokens_out": 89
+    }
+  ]
+}

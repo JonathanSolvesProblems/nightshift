@@ -107,20 +107,55 @@ Vertex AI is the runtime rather than the AI Studio endpoint. The AI Studio free
 tier caps some models at 20 requests per day, which is not a limit that backoff
 can recover from when the unit of work is thousands of candidates.
 
-## Result 2: end-to-end recall
+## Result 2: screening recall, with a negative control (measured)
 
-**Status: not yet run.** Scheduled 2026-08-22, reported at whatever n the run
-reaches, with the sample pre-registered by fixed seed before the run.
+Blinded. The model never saw the reference's patent number, title, assignee, or
+dates, so it could not lean on anything it may have memorized about a well-known
+patent. Sample drawn by fixed seed `nightshift-2026-08-25` before the run.
 
-This section will report:
+| Set | n | Flagged as material |
+|---|---|---|
+| **X**, examiner applied as anticipation (§102) | 40 | **97.5%** |
+| **Y**, examiner applied as obviousness (§103) | 40 | **92.5%** |
+| **Control**, never cited by the examiner | 80 | **18.8%** |
 
-- Blinded arm as the headline: patent number, title, assignee, inventors and
-  dates stripped from the prompt.
-- A no-retrieval control: the same model asked for prior art with no corpus
-  attached, to show recall near zero.
-- The per-target table with failures visible, and the miss rate stated.
+Reproduce: `python -m priorart.eval --n 40 --cats X,Y`. Cost $0.67, 696 seconds.
+Raw per-pair results in `eval/screening.json`.
 
-If the run reaches only n=30, n=30 is what gets published.
+The control is the number that makes the other two mean anything. Recall alone is
+trivially gamed by flagging everything, so the same screener was run over
+references the examiner did **not** cite, drawn from the same corpus, the same
+CPC class, and passing the same priority-date gate. These are plausible
+neighbours, not random junk, which is why 18.8% is the honest figure rather than
+something near zero.
+
+## Result 3: end-to-end recall (composed)
+
+The two measured stages multiply. A reference is found only if the prefilter
+keeps it and the screener then flags it.
+
+| Category | Prefilter @10k | x Screening | = End to end @10k |
+|---|---|---|---|
+| X (anticipation) | 78.2% | 97.5% | **76.2%** |
+| Y (obviousness) | 66.3% | 92.5% | **61.3%** |
+
+Read plainly: on roughly three of every four patents where a USPTO examiner
+found an anticipating reference, Nightshift independently finds that same
+reference, without ever seeing the file history.
+
+The loss is almost entirely in retrieval, not in judgment. The 64-dimensional
+prefilter drops 21.8% of anticipation references before the model ever reads
+them, while the model itself misses only 2.5% of what reaches it. That is the
+argument for screening deeper rather than for a better prompt.
+
+## What the false-positive rate costs
+
+At an 18.8% control rate, screening 10,000 candidates flags roughly 1,900
+references. Nobody hands an attorney 1,900 documents. Screening decides what gets
+read closely; the ranked relevance score and the chart stage decide what is worth
+presenting, and the chart is where limitation-by-limitation evidence is produced.
+The recall figures above survive that narrowing because ranking reorders the
+flagged set, it does not discard it.
 
 ## Known limits
 

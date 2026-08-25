@@ -1,0 +1,6 @@
+﻿.secrets/
+.env
+runs/
+.git/
+__pycache__/
+*.pyc

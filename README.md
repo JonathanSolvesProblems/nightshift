@@ -138,5 +138,5 @@ configurable scan ceiling. The whole corpus build fits inside the free tier.
 
 ## Documentation
 
-- [`docs/DAY1-FINDINGS.md`](docs/DAY1-FINDINGS.md) — the measurements that shaped the design
-- [`ACCURACY.md`](ACCURACY.md) — end-to-end accuracy
+- [`docs/DAY1-FINDINGS.md`](docs/DAY1-FINDINGS.md): the measurements that shaped the design
+- [`ACCURACY.md`](ACCURACY.md): end-to-end accuracy
