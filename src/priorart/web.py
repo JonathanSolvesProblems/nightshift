@@ -101,18 +101,25 @@ h2{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink3)
 .funnel .found dd{color:var(--seam)}
 
 /* the depth column: the one loud element on the page */
-.rig{display:grid;grid-template-columns:104px 1fr;gap:var(--s4)}
+.rig{display:grid;grid-template-columns:168px 1fr;gap:var(--s4)}
 .core{position:relative;background:var(--well);border:1px solid var(--hairline);
-  box-shadow:inset 0 2px 4px rgba(0,0,0,.35);min-height:460px;overflow:hidden}
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.4);min-height:480px;overflow:hidden}
 .band{position:absolute;left:0;right:0}
-.drill{position:absolute;left:0;right:0;top:0;background:rgba(0,0,0,.34);
-  border-bottom:1px solid var(--seam);transition:height var(--settle) var(--ease)}
-.seam{position:absolute;left:0;right:0;height:2px;background:var(--seam);
-  opacity:.5;transition:top var(--settle) var(--ease)}
-.seam.hot{height:3px;opacity:1;box-shadow:0 0 0 1px var(--seam-ink)}
-.ruler{position:relative;min-height:460px;color:var(--ink3);font-size:10.5px}
+/* The cut face: a light scrim over ground already read, with a bright kerf at
+   the working depth. Not a fill, because the strata under it must stay legible. */
+.drill{position:absolute;left:0;right:0;top:0;background:rgba(0,0,0,.16);
+  border-bottom:2px solid var(--seam);transition:height var(--settle) var(--ease)}
+/* Only references worth an attorney's time are cut as seams. An earlier version
+   drew every flagged candidate and 231 of them turned the column into a barcode
+   that hid the strata entirely. */
+.seam{position:absolute;left:0;right:0;height:3px;background:var(--seam);
+  box-shadow:0 0 0 1px rgba(0,0,0,.55);transition:top var(--settle) var(--ease)}
+.seam.deepest{height:5px}
+.seam.deepest::after{content:"";position:absolute;right:-7px;top:-3px;
+  border:5px solid transparent;border-right-color:var(--seam)}
+.ruler{position:relative;min-height:480px;color:var(--ink3);font-size:10.5px}
 .tick{position:absolute;left:0;white-space:nowrap}
-.corewrap{display:grid;grid-template-columns:1fr 46px;gap:var(--s1)}
+.corewrap{display:grid;grid-template-columns:1fr 52px;gap:var(--s2)}
 
 /* shard tasks: witness marks, not status pills */
 .tasks{display:flex;flex-wrap:wrap;gap:3px;margin-top:var(--s2)}
@@ -157,7 +164,12 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .lim-text{color:var(--ink2);font-size:13px;line-height:1.55}
 .quote{border-left:2px solid var(--seam);padding-left:var(--s2);font-size:13.5px;
   line-height:1.6;margin-bottom:var(--s2)}
+.quote.partial{border-left-style:dashed}
 .quote.absent{border-left-color:var(--ink3);color:var(--ink3);font-style:italic}
+.level{font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;
+  margin-bottom:var(--s1);color:var(--seam)}
+.level.partial{color:var(--ink2)}
+.level.absent{color:var(--ink3)}
 .why{color:var(--ink2);font-size:12.5px;line-height:1.55}
 
 @media (max-width:760px){
@@ -213,14 +225,39 @@ async function tick(){
   const drill = document.getElementById("drill");
   if(drill) drill.style.height = Math.min(100, (run.screened/total)*100).toFixed(2) + "%";
 
-  // A seam sits at the depth its rank actually occupies.
+  // Seams are cut at the depth a reference's rank actually occupies, and the
+  // set drawn is capped.
+  //
+  // Two earlier versions failed here. Drawing all 231 flagged candidates, and
+  // then all 45 that cleared the tier, both produced a barcode that hid the
+  // strata completely. Seam density scales with candidate count, so this does
+  // not resolve itself on a larger run; it gets worse. The column earns its
+  // place only if a seam is rare, so the strongest references are drawn and the
+  // count that was not drawn is stated in the caption rather than hidden.
   core.querySelectorAll(".seam").forEach(e => e.remove());
-  (d.findings||[]).forEach(f => {
+  const strong = (d.findings||[]).filter(f => (f.relevance||0) >= 2);
+  const deepest = strong.reduce((a,f) => Math.max(a, f.rank||0), 0);
+  const CAP = 12;
+  const drawn = strong
+    .slice()
+    .sort((a,b) => (b.limitations_disclosed||[]).length - (a.limitations_disclosed||[]).length)
+    .slice(0, CAP);
+  if (deepest > 0 && !drawn.some(f => (f.rank||0) === deepest)) {
+    drawn.push(strong.find(f => (f.rank||0) === deepest));
+  }
+  drawn.filter(Boolean).forEach(f => {
     const el = document.createElement("div");
-    el.className = "seam" + ((f.relevance||0) >= 2 ? " hot" : "");
-    el.style.top = Math.min(99.6, ((f.rank||0)/total)*100).toFixed(2) + "%";
+    const lims = (f.limitations_disclosed||[]).length;
+    el.className = "seam" + ((f.rank||0) === deepest && deepest > 0 ? " deepest" : "");
+    el.style.top = Math.min(99.4, ((f.rank||0)/total)*100).toFixed(2) + "%";
+    el.style.height = Math.max(2, Math.min(6, lims)) + "px";
+    el.title = "US " + f.patent_id + " at depth " + n(f.rank) + ", " + lims + " limitations";
     core.appendChild(el);
   });
+  const cap = document.getElementById("seamcap");
+  if (cap) cap.textContent = strong.length > drawn.length
+    ? drawn.length + " strongest of " + strong.length + " marked, thickness by limitations matched"
+    : (strong.length ? strong.length + " marked, thickness by limitations matched" : "");
 
   const done = d.shards.filter(s => s.status === "done").length;
   document.getElementById("tasks").innerHTML = d.shards.map(s =>
@@ -357,6 +394,7 @@ def run_page(run_id: str):
         <div class=core id=core></div>
         <div class=ruler id=ruler></div>
       </div>
+      <div class=note id=seamcap style="font-size:11px;max-width:none"></div>
     </div>
     <div>
       <h2>Cut</h2>
@@ -430,7 +468,7 @@ def chart_page(run_id: str):
             "mappings": [
                 {
                     "limitation": m.limitation,
-                    "discloses": m.discloses,
+                    "level": m.level,
                     "mapped_text": m.mapped_text,
                     "reasoning": m.reasoning,
                 }
@@ -440,21 +478,33 @@ def chart_page(run_id: str):
         store.update_run(run_id, chart=cached)
 
     lim_text = {l["index"]: l["text"] for l in run.get("limitations", [])}
+    labels = {
+        "FULL": ("taught by this reference", ""),
+        "PARTIAL": ("substance taught, wording narrower", "partial"),
+        "ABSENT": ("not taught by this reference", "absent"),
+    }
     rows = ""
     for m in cached["mappings"]:
         lid = m["limitation"]
-        body = (
-            f'<div class="quote">{_esc(m["mapped_text"])}</div>'
-            if m["discloses"] and m["mapped_text"]
-            else '<div class="quote absent">Not disclosed by this reference.</div>'
+        level = (m.get("level") or ("FULL" if m.get("discloses") else "ABSENT")).upper()
+        caption, cls = labels.get(level, labels["ABSENT"])
+        quote = (
+            f'<div class="quote {cls}">{_esc(m["mapped_text"])}</div>'
+            if m.get("mapped_text")
+            else f'<div class="quote {cls}">No supporting passage in this reference.</div>'
         )
         rows += (
             f'<div class=lim><div><div class=lim-id>{_esc(lid)}</div>'
             f'<div class=lim-text>{_esc(lim_text.get(lid, ""))}</div></div>'
-            f'<div>{body}<div class=why>{_esc(m["reasoning"])}</div></div></div>'
+            f'<div><div class="level {cls}">{caption}</div>{quote}'
+            f'<div class=why>{_esc(m["reasoning"])}</div></div></div>'
         )
 
-    disclosed = sum(1 for m in cached["mappings"] if m["discloses"])
+    def _lvl(m):
+        return (m.get("level") or ("FULL" if m.get("discloses") else "ABSENT")).upper()
+
+    full = sum(1 for m in cached["mappings"] if _lvl(m) == "FULL")
+    partial = sum(1 for m in cached["mappings"] if _lvl(m) == "PARTIAL")
     total = len(cached["mappings"])
 
     return shell(
@@ -470,8 +520,10 @@ def chart_page(run_id: str):
     <div class=note>
       Surfaced at depth <span class=num>{cached.get('rank',0):,}</span> of
       <span class=num>{run.get('eligible',0):,}</span> eligible references.
-      <span class=num>{disclosed}</span> of <span class=num>{total}</span>
-      limitations have a counterpart in this reference.
+      Of <span class=num>{total}</span> limitations,
+      <span class=num>{full}</span> are taught by this reference and
+      <span class=num>{partial}</span> are taught in substance with narrower
+      claim wording.
     </div>
   </div>
   {rows}

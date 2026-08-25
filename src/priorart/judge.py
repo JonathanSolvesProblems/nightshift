@@ -43,9 +43,10 @@ class Limitation:
 @dataclass
 class Mapping:
     limitation: str
-    discloses: bool
     mapped_text: str
     reasoning: str
+    level: str = "ABSENT"      # FULL | PARTIAL | ABSENT
+    discloses: bool = False    # FULL or PARTIAL
 
 
 @dataclass
@@ -325,16 +326,29 @@ CHART_SCHEMA = {
                 "type": "OBJECT",
                 "properties": {
                     "limitation": {"type": "STRING"},
-                    "discloses": {"type": "BOOLEAN"},
+                    "level": {"type": "STRING", "enum": ["FULL", "PARTIAL", "ABSENT"]},
                     "mapped_text": {"type": "STRING"},
                     "reasoning": {"type": "STRING"},
                 },
-                "required": ["limitation", "discloses", "mapped_text", "reasoning"],
+                "required": ["limitation", "level", "mapped_text", "reasoning"],
             },
         }
     },
     "required": ["mappings"],
 }
+
+# Charting takes three states, not two.
+#
+# A binary discloses/does-not collapses the most common real case, which is a
+# reference that teaches the substance of a limitation while omitting a piece of
+# claim boilerplate. The first version of this prompt returned ABSENT for all
+# eight limitations of a reference screening had matched on all eight, because it
+# withheld on wording like "non-volatile" and "mobile application". An all-absent
+# chart is not a careful chart, it is a useless one, and it disagreed with the
+# stage that selected the reference in the first place.
+CHART_LEVELS = """FULL     the reference teaches this limitation, including its substantive requirements
+PARTIAL  the reference teaches the substance but omits or generalises part of it
+ABSENT   the reference does not teach this limitation at all"""
 
 
 def chart(candidate, limitations: list[Limitation], gc: genai.Client) -> list[Mapping]:
@@ -344,27 +358,56 @@ def chart(candidate, limitations: list[Limitation], gc: genai.Client) -> list[Ma
     find it, and so an empty span is a visible signal that nothing was found.
     """
     lim_block = "\n".join(f"[{l.index}] {l.text}" for l in limitations)
+    valid = ", ".join(l.index for l in limitations)
     prompt = (
         "Build a claim chart row for every limitation below against this "
         "reference.\n\n"
-        "For each limitation, quote the exact span of the reference that meets "
-        "it, copied verbatim. If the reference does not disclose the limitation, "
-        "set discloses=false and leave mapped_text empty. Never invent text that "
-        "is not in the reference, and never state a conclusion about validity.\n\n"
+        "Return the limitation LABEL only in the `limitation` field, exactly as "
+        f"given. Valid labels are: {valid}. Do not put the limitation text there.\n\n"
+        "Judge technical substance, not wording. Prior art rarely uses the "
+        "claim's vocabulary, so a reference teaching the same mechanism in "
+        "different words still counts. Generic implementation recitations "
+        "(processors, memory, non-transitory or non-volatile storage, mobile "
+        "devices, network connections) are not what distinguishes a claim; do not "
+        "return ABSENT because such wording is missing when the substance is "
+        "present. Use PARTIAL for that case.\n\n"
+        f"LEVELS:\n{CHART_LEVELS}\n\n"
+        "Quote the exact span of the reference that supports your finding, copied "
+        "verbatim, for FULL and PARTIAL. Leave mapped_text empty for ABSENT. "
+        "Never invent text that is not in the reference, and never state a "
+        "conclusion about validity.\n\n"
         f"CLAIM LIMITATIONS:\n{lim_block}\n\n"
         f"REFERENCE TEXT:\n{candidate.disclosure[:20000]}"
     )
     resp = generate(gc, prompt, CHART_SCHEMA)
     data = resp.parsed or {}
-    return [
-        Mapping(
-            limitation=m["limitation"],
-            discloses=bool(m["discloses"]),
-            mapped_text=m.get("mapped_text", ""),
-            reasoning=m.get("reasoning", ""),
+
+    # The label is matched leniently. An earlier version trusted it verbatim, and
+    # when the model returned the whole limitation text instead of the label the
+    # lookup silently returned nothing and the chart rendered the claim text in
+    # the label's style, unreadable.
+    by_norm = {normalize_label(l.index): l.index for l in limitations}
+
+    out: list[Mapping] = []
+    for m in data.get("mappings", []):
+        raw = m.get("limitation", "")
+        key = normalize_label(raw)
+        label = by_norm.get(key)
+        if label is None:
+            label = next(
+                (idx for norm, idx in by_norm.items() if key.startswith(norm)), raw
+            )
+        level = (m.get("level") or "ABSENT").upper()
+        out.append(
+            Mapping(
+                limitation=label,
+                level=level,
+                discloses=level in ("FULL", "PARTIAL"),
+                mapped_text=m.get("mapped_text", ""),
+                reasoning=m.get("reasoning", ""),
+            )
         )
-        for m in data.get("mappings", [])
-    ]
+    return out
 
 
 def normalize_label(s: str) -> str:

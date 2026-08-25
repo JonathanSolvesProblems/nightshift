@@ -138,6 +138,21 @@ def main() -> int:
         seconds=round(elapsed, 1),
     )
 
+    # Whichever task finishes last closes the run. Tasks never talk to each
+    # other, so completion has to be observed from the shared state rather than
+    # coordinated: each one checks whether any shard is still outstanding.
+    shards = store.list_shards(run_id)
+    if len(shards) >= count and all(s.get("status") == "done" for s in shards):
+        store.update_run(
+            run_id,
+            status="done",
+            finished_at=time.time(),
+            total_screened=sum(s.get("screened", 0) for s in shards),
+            total_findings=sum(s.get("findings", 0) for s in shards),
+            total_usd=round(sum(s.get("usd", 0) for s in shards), 4),
+        )
+        print(f"run {run_id} complete", file=sys.stderr)
+
     print(
         f"shard {index} done: {screened} screened, {findings} findings, "
         f"{elapsed:.0f}s, ${cost:.4f}",
