@@ -28,12 +28,23 @@ from . import config
 
 _client: firestore.Client | None = None
 
+# A named database rather than "(default)".
+#
+# Inside the Cloud Run container every Firestore call against the default
+# database failed with `400 Invalid database id %28default%29`: the parentheses
+# were being percent-encoded into the resource name and the server rejected the
+# result. The same code worked locally, and pinning the client and api-core
+# versions did not change it. A database whose id contains no parentheses avoids
+# the encoding path altogether.
+DATABASE = os.environ.get("PRIOR_ART_FIRESTORE_DB", "nightshift")
+
 
 def db() -> firestore.Client:
     global _client
     if _client is None:
         _client = firestore.Client(
-            project=os.environ.get("PRIOR_ART_PROJECT", config.PROJECT_ID)
+            project=os.environ.get("PRIOR_ART_PROJECT", config.PROJECT_ID),
+            database=DATABASE,
         )
     return _client
 

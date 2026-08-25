@@ -1,6 +1,13 @@
 google-cloud-bigquery>=3.25.0
 google-genai>=1.0.0
-google-cloud-firestore>=2.16.0
+
+# Pinned deliberately. An unpinned resolve inside the container produced a
+# Firestore client that double-encoded the default database id and every call
+# failed with "400 Invalid database id %28default%29", while the same code
+# worked locally. These are the versions verified end to end.
+google-cloud-firestore==2.29.0
+google-api-core==2.34.0
+
 google-cloud-pubsub>=2.21.0
 google-cloud-run>=0.10.0
 fastapi>=0.115.0

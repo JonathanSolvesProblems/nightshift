@@ -6,6 +6,8 @@ A law firm quotes $5,000 to $15,000 and one to three weeks to answer one questio
 was this patent already invented? Most small companies never ask, because asking
 costs more than settling. Nightshift asks, autonomously, in the background.
 
+**Live: https://nightshift-1015687974010.us-central1.run.app**
+
 Built for the All Things Agentic Hackathon, track: **The Taskmaster**.
 
 > **PRIOR ART EVIDENCE DOSSIER, NOT A LEGAL OPINION.**
@@ -54,9 +56,43 @@ The embedding is 64-dimensional and would be useless for precision retrieval.
 It does not need to be precise. It needs to be a high-recall funnel in front of a
 model that reads what survives.
 
-### End-to-end accuracy
+### Does it find what a patent examiner found?
 
-See [`ACCURACY.md`](ACCURACY.md).
+Blinded. The model never saw the reference's patent number, title, assignee or
+dates, so it could not lean on anything it may have memorized.
+
+| Set | n | Flagged as material |
+|---|---|---|
+| **X**, examiner applied as anticipation (§102) | 40 | **97.5%** |
+| **Y**, examiner applied as obviousness (§103) | 40 | **92.5%** |
+| **Control**, never cited by the examiner | 80 | **18.8%** |
+
+The control is what makes the other two mean anything: recall alone is trivially
+gamed by flagging everything, so the same screener was run over references the
+examiner did not cite, drawn from the same corpus and passing the same
+priority-date gate.
+
+Composed with prefilter recall, end to end at 10,000 candidates:
+
+| Category | Prefilter | x Screening | = End to end |
+|---|---|---|---|
+| X (anticipation) | 78.2% | 97.5% | **76.2%** |
+| Y (obviousness) | 66.3% | 92.5% | **61.3%** |
+
+The loss is almost entirely in retrieval, not judgment. The prefilter drops 21.8%
+of anticipation references before the model reads them; the model misses 2.5% of
+what reaches it. That is the argument for reading deeper rather than for a better
+prompt.
+
+Full method, denominators and limits: [`ACCURACY.md`](ACCURACY.md).
+
+### The number that explains the architecture
+
+For US 10,002,398 the reference a USPTO examiner actually applied as an
+anticipation rejection sits at **rank 6,426 of 149,721** eligible references.
+
+Top-50 retrieval never surfaces it. Neither does top-500. It is only found by a
+system willing to read several thousand candidates.
 
 ## Scope, stated up front
 
