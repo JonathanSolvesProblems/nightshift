@@ -148,6 +148,40 @@ prefilter drops 21.8% of anticipation references before the model ever reads
 them, while the model itself misses only 2.5% of what reaches it. That is the
 argument for screening deeper rather than for a better prompt.
 
+## Why the eligibility gate is on filing date, not grant date
+
+From a live run against US 10,002,398, the highest ranked finding was
+US 10,304,102, which addressed all 8 limitations of claim 1.
+
+| | Filed | Granted |
+|---|---|---|
+| Target, US 10,002,398 | 2017-09-27 | 2018-06-19 |
+| Finding, US 10,304,102 | **2016-01-08** | 2019-05-28 |
+
+The reference was granted almost a year *after* the target and filed almost two
+years *before* its priority date. It is valid prior art under §102(a)(2), and a
+filter on grant date would have silently discarded the best result in the run.
+
+52.8% of corpus patents claim priority earlier than their own filing date, so
+neither grant date nor filing date alone is sufficient. `corpus.dates_g06q`
+resolves the earliest of filing date, foreign priority claims, and related US
+documents.
+
+## Findings are reported in two tiers
+
+A live run screening 240 candidates against US 10,002,398 returned 145 flagged
+references. Reporting that as 145 "material" results would overstate it:
+
+| Tier | Count | Meaning |
+|---|---|---|
+| Worth reading | 26 | relevance 2+, addresses part of the claimed approach |
+| Partial overlap | 119 | relevance 1, same field, does not address the approach |
+
+Screening is deliberately generous, because it decides what gets read closely: a
+false positive costs one more model call, while a false negative loses the
+reference for good. The ranked tiers, not the raw flagged count, are what the
+run page shows and what an attorney would work from.
+
 ## What the false-positive rate costs
 
 At an 18.8% control rate, screening 10,000 candidates flags roughly 1,900

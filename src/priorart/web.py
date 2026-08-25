@@ -126,9 +126,21 @@ def api_run(run_id: str):
     if not run:
         return JSONResponse({"error": "not found"}, status_code=404)
     shards = store.list_shards(run_id)
-    findings = store.list_findings(run_id, 60)
+    # Tier counts are computed over every finding in the run; only the display
+    # list is truncated.
+    all_findings = store.list_findings(run_id)
+    findings = all_findings[:60]
     run["screened"] = sum(s.get("screened", 0) for s in shards)
-    run["findings"] = len(findings)
+    run["findings"] = len(all_findings)
+    # Two tiers, reported separately.
+    #
+    # Screening is deliberately generous: it decides what gets read closely, so a
+    # false positive costs one more call while a false negative loses the
+    # reference for good. That means the raw flagged count overstates what is
+    # worth an attorney's time. Relevance 2 and above is "addresses part of the
+    # claimed approach"; relevance 1 is "same field, does not address it".
+    run["strong"] = sum(1 for f in all_findings if (f.get("relevance") or 0) >= 2)
+    run["partial"] = run["findings"] - run["strong"]
     return JSONResponse({"run": run, "shards": shards, "findings": findings})
 
 
@@ -148,7 +160,8 @@ def run_page(run_id: str, request: Request):
     <div class="stat drop"><div class=n id=dropped>0</div><div class=l>not prior art</div></div>
     <div class=stat><div class=n id=eligible>0</div><div class=l>eligible</div></div>
     <div class=stat><div class=n id=screened>0</div><div class=l>read by Gemini</div></div>
-    <div class="stat hit"><div class=n id=found>0</div><div class=l>material</div></div>
+    <div class="stat hit"><div class=n id=found>0</div><div class=l>worth reading</div></div>
+    <div class=stat><div class=n id=partial>0</div><div class=l>partial overlap</div></div>
   </div>
   <div class=grid id=grid></div>
   <div class=note id=status>starting</div>
@@ -156,7 +169,7 @@ def run_page(run_id: str, request: Request):
 <div class=card>
   <h1 style="font-size:13px">Findings</h1>
   <div style="margin-top:12px"><table id=ft>
-    <tr><th>patent</th><th>filed</th><th>limitations</th><th>what it discloses</th></tr>
+    <tr><th>patent</th><th>filed</th><th>tier</th><th>limitations</th><th>what it discloses</th></tr>
   </table></div>
 </div>
 <script>
@@ -169,16 +182,18 @@ async function tick(){{
   dropped.textContent=n(run.dropped_not_prior_art);
   eligible.textContent=n(run.eligible);
   screened.textContent=n(run.screened);
-  found.textContent=n(run.findings);
+  found.textContent=n(run.strong);
+  partial.textContent=n(run.partial);
   grid.innerHTML = d.shards.map(s=>
     `<div class="t ${{s.status==='done'?'done':'run'}}" title="${{s.screened}}/${{s.assigned}}">${{s.index}}</div>`).join('');
   const done=d.shards.filter(s=>s.status==='done').length;
   status.textContent = run.status==='queued' ? 'queued'
     : `${{done}} of ${{d.shards.length||run.tasks||0}} Cloud Run tasks finished`;
-  ft.innerHTML = '<tr><th>patent</th><th>filed</th><th>limitations</th><th>what it discloses</th></tr>' +
+  ft.innerHTML = '<tr><th>patent</th><th>filed</th><th>tier</th><th>limitations</th><th>what it discloses</th></tr>' +
     d.findings.map(f=>`<tr><td class=mono>US ${{f.patent_id}}</td><td class=mono>${{(f.filing_date||'').slice(0,10)}}</td>`+
+    `<td><span class=pill>${{(f.relevance||0)>=2?'worth reading':'partial'}}</span></td>`+
     `<td><span class=pill>${{(f.limitations_disclosed||[]).length}}</span></td>`+
-    `<td>${{(f.summary||'').slice(0,190)}}</td></tr>`).join('');
+    `<td>${{(f.summary||'').slice(0,175)}}</td></tr>`).join('');
 }}
 tick(); setInterval(tick, 2000);
 </script>

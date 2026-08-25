@@ -115,21 +115,28 @@ def add_finding(run_id: str, verdict) -> None:
     run_ref(run_id).collection("findings").document(str(data["patent_id"])).set(data)
 
 
-def list_findings(run_id: str, limit: int = 100) -> list[dict]:
-    """Findings are sorted in Python rather than by Firestore.
+def list_findings(run_id: str, limit: int | None = None) -> list[dict]:
+    """All findings for a run, best first.
 
-    Ordering in the query would need an index on a subcollection field, and an
-    index that is still building returns an error rather than a slower result.
-    A run has at most a few hundred findings, so sorting here costs nothing and
-    removes a deployment-time dependency.
+    Sorted in Python rather than by Firestore: ordering in the query needs an
+    index on a subcollection field, and an index that is still building returns
+    an error rather than a slower result.
+
+    `limit` truncates AFTER sorting, never before. Reading a capped page and then
+    sorting it returns an arbitrary subset of the run and can omit the highest
+    ranked references entirely, which is worse than useless on a page whose whole
+    job is to show the best ones first.
     """
     try:
-        docs = run_ref(run_id).collection("findings").limit(limit).stream()
+        docs = run_ref(run_id).collection("findings").stream()
         rows = [d.to_dict() for d in docs]
     except Exception:  # noqa: BLE001 - a read failure must not blank the page
         return []
-    return sorted(rows, key=lambda f: (f.get("relevance", 0), f.get("found_at", 0)),
-                  reverse=True)
+    rows.sort(
+        key=lambda f: (f.get("relevance", 0), len(f.get("limitations_disclosed") or [])),
+        reverse=True,
+    )
+    return rows[:limit] if limit else rows
 
 
 def list_shards(run_id: str) -> list[dict]:
