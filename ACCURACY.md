@@ -63,6 +63,65 @@ own stored vector. A 64-dimensional embedding is far too coarse for precision
 retrieval and entirely adequate as a high-recall funnel, which is the whole
 architectural argument.
 
+## The demo case, end to end
+
+Run `10140422-8426b879`, a real Cloud Run execution against real USPTO data.
+
+**Target:** US 10,140,422, "Progression analytics system", priority 2013-03-15.
+**What the USPTO did:** during prosecution an examiner applied US 8,265,955,
+"Methods and systems for assessing clinical outcomes", against it as a
+category-X anticipation rejection.
+**What Nightshift did:** blinded, without ever seeing the file history, it
+independently surfaced that same reference.
+
+| | |
+|---|---|
+| In CPC G06Q | 171,723 |
+| Eligible after the priority-date gate | 100,104 |
+| Read by Gemini | 2,000 |
+| Worth reading | 208 |
+| **Depth of the examiner's reference** | **548 of 100,104** |
+| Wall time | 223 s across 10 Cloud Run tasks |
+| Cost | **$8.29** |
+
+Against the $5,000 to $15,000 and one to three weeks a firm quotes for the same
+question.
+
+Depth 548 is the whole argument. A tool that ranks the corpus and shows a human
+the top fifty never surfaces this reference. Neither does one that shows the top
+five hundred.
+
+The two patents also share almost no vocabulary: the claim calls itself a
+progression analytics system and the reference calls itself a method for
+assessing clinical outcomes. That is why keyword search does not find it, and it
+is why the judgment stage has to read rather than match.
+
+### How this case was chosen
+
+It was selected by `scripts/pick_demo_target.py`, which scores candidates rather
+than picking one that looks good. It ranks gold pairs where an examiner applied a
+category-X reference, computes how deep that reference sits, charts it, and
+counts how much of the claim it teaches. The output is in
+`eval/demo-candidates.json`.
+
+The trade is real and visible in that file. The strongest chart in the candidate
+set (US 10,310,505) sits at rank 35, where ordinary retrieval would find it
+anyway and the depth argument collapses. The deepest find (US 10,229,396 at rank
+6,313) charts no limitations as fully taught. This case was chosen because it is
+deep enough that no searcher reads to it and strong enough that the chart says
+something, including the limitations it says are not taught at all.
+
+### One caveat about the per-limitation counts
+
+The split between "taught outright" and "taught in substance with narrower claim
+wording" is not stable across runs. The same reference charted twice against the
+same claim, same model, temperature 0, returned FULL 4 / PARTIAL 5 once and
+FULL 3 / PARTIAL 4 the next time. It is a judgment call sitting on a boundary.
+
+The counts are therefore reported from whatever run is on screen, and are never
+quoted as a fixed property of the pair. What is stable is the depth, the
+identity of the reference, and the fact that an examiner applied it.
+
 ## Worked example: why depth is the whole point
 
 US 10,002,398, "System for facilitating real estate transaction". During

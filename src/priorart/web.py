@@ -269,7 +269,9 @@ async function tick(){
 
   document.getElementById("rows").innerHTML = (d.findings||[]).map(f =>
     `<tr><td class="n num">${n(f.rank)}</td>`+
-    `<td class="n num">US ${esc(f.patent_id)}</td>`+
+    `<td class="n num">${(f.relevance||0)>=2
+      ? `<a href="/chart/${RID}?ref=${esc(f.patent_id)}">US ${esc(f.patent_id)}</a>`
+      : `US ${esc(f.patent_id)}`}</td>`+
     `<td class="n num">${esc((f.filing_date||"").slice(0,4))}</td>`+
     `<td><span class="tier ${(f.relevance||0)>=2?"hot":""}">${(f.relevance||0)>=2?"worth reading":"partial"}</span></td>`+
     `<td class="n num">${n((f.limitations_disclosed||[]).length)}</td>`+
@@ -432,20 +434,27 @@ def run_page(run_id: str):
 
 
 @app.get("/chart/{run_id}", response_class=HTMLResponse)
-def chart_page(run_id: str):
+def chart_page(run_id: str, ref: str | None = None):
     """The deliverable: one reference mapped limitation by limitation.
 
-    Charting is computed on demand and cached, because it reads far more text per
-    reference than screening does and only makes sense for references screening
-    actually surfaced.
+    `ref` charts a specific reference rather than the top-ranked one, because
+    which reference is worth charting is the user's call: the strongest match on
+    the screen's own ranking is not always the one an attorney wants mapped.
+
+    Charting is computed on demand and cached per reference, because it reads far
+    more text per reference than screening does and only makes sense for
+    references screening actually surfaced.
     """
     run = store.get_run(run_id)
     if not run:
         return shell("Not found", run_id, "<div class=well>No such borehole.</div>")
 
-    cached = run.get("chart")
+    charts = run.get("charts") or {}
+    cached = charts.get(ref) if ref else run.get("chart")
     if not cached:
         findings = [f for f in store.list_findings(run_id) if (f.get("relevance") or 0) >= 2]
+        if ref:
+            findings = [f for f in findings if str(f.get("patent_id")) == str(ref)]
         if not findings:
             return shell(
                 "No chart yet",
@@ -475,7 +484,11 @@ def chart_page(run_id: str):
                 for m in mappings
             ],
         }
-        store.update_run(run_id, chart=cached)
+        if ref:
+            charts[str(ref)] = cached
+            store.update_run(run_id, charts=charts)
+        else:
+            store.update_run(run_id, chart=cached)
 
     lim_text = {l["index"]: l["text"] for l in run.get("limitations", [])}
     labels = {

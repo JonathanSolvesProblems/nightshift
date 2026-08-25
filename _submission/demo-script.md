@@ -1,0 +1,150 @@
+# Demo script, ~4 minutes
+
+Written before recording, per the rule that a script that needs cuts and "let me
+also show you" pivots is describing a project too diffuse to win.
+
+Every number spoken here is produced by the system. Nothing is seeded. The run
+shown on camera is a real Cloud Run execution against real USPTO data, and the
+run id is on screen so a judge can check it.
+
+**Recording rule:** grep the tree for any seed, stub, or fixture before rolling.
+If the climax displays anything a script put there rather than the system
+produced, fix that before recording anything.
+
+---
+
+## 0:00 – 0:22 · Cold open. No logo, no title card.
+
+*On screen: the demand letter, then the asserted patent number typed in.*
+
+> A patent holding company sends this letter to a forty-person software company.
+> It asserts one patent. Before anyone can answer it, somebody has to find out
+> whether the invention was already invented, and a law firm quotes five to
+> fifteen thousand dollars and one to three weeks to answer that one question.
+>
+> Most companies that get this letter never ask. They settle, because looking
+> costs more than folding.
+
+## 0:22 – 0:40 · One action, then walk away.
+
+*Patent number entered. "Sink a borehole" clicked. Claim 1 splits into eleven
+limitations. Cut to the core log page.*
+
+> This is US 10,140,422. Claim 1 breaks into eleven limitations, and every US
+> patent in this class that predates its priority date is now eligible prior art.
+>
+> A hundred thousand of them.
+
+## 0:40 – 1:35 · The engine, live, split screen.
+
+*Left: the core log, funnel counting down, seams appearing at depth, tasks
+lighting up. Right: the actual Cloud Run Jobs console and Vertex AI logs.*
+
+> A hundred and seventy-one thousand patents in the class. Fifty-two percent of
+> them claim priority earlier than their own filing date, so filtering on grant
+> date would be wrong in both directions. Filed after the priority date, and
+> they are not prior art at all: those drop.
+>
+> A hundred thousand survive. Gemini 3.5 Flash reads two thousand of them, one
+> call per patent, against every limitation, spread across ten Cloud Run tasks
+> pulling shards from BigQuery.
+>
+> The bands are the corpus by filing decade. The bright lines are seams: the
+> references worth an attorney's time, marked at the depth they were found.
+
+## 1:35 – 1:55 · The async beat.
+
+*Timestamps on screen. Tab closed. Reopened later.*
+
+> This is a background job. Close the tab and it keeps going, because the work
+> is running on Cloud Run, not in the browser.
+
+## 1:55 – 3:10 · The payoff. The longest block.
+
+*The claim chart, one row at a time.*
+
+> Here is what it found, and here is why it matters.
+>
+> US 8,265,955, filed in 2011, two years before this patent's priority date. The
+> claim calls itself a progression analytics system. The reference calls itself
+> a method for assessing clinical outcomes. They share almost no vocabulary,
+> which is exactly why a keyword search does not find this.
+>
+> [READ THE COUNTS OFF THE RECORDED CHART. Do not narrate them from this script.]
+> Limitations taught outright. More taught in substance, where the claim recites
+> narrower wording than the reference uses. And some the reference does not teach
+> at all, said plainly, because a chart with no gaps in it is not a chart anyone
+> should trust.
+>
+> Every quote is copied verbatim out of the reference so an attorney can go and
+> read it.
+
+## 3:10 – 3:40 · The receipt. Thirty seconds, no more.
+
+*The /eval page.*
+
+> It sat at depth 548 of a hundred thousand. Nothing that shows a human the top
+> fifty results finds it.
+>
+> And this is not my opinion of my own work. A USPTO examiner applied that exact
+> reference against that exact patent, as an anticipation rejection, during
+> prosecution. Nightshift found it without ever seeing the file history.
+>
+> Across forty of those cases, blinded, it re-found the examiner's anticipation
+> reference ninety-seven and a half percent of the time. Against references the
+> examiner never cited, it stays quiet eighty-one percent of the time. That
+> second number is what makes the first one mean anything.
+
+## 3:40 – 4:00 · Close.
+
+> Five thousand to fifteen thousand dollars and up to three weeks, against one
+> run, and single-digit dollars of Gemini.
+>
+> It reports what a reference discloses. Whether the claim is invalid is still a
+> question for a lawyer. This is the evidence that lawyer starts from.
+
+*Repo URL, live URL, run id on screen.*
+
+---
+
+## Shot list
+
+| # | Shot | Source |
+|---|---|---|
+| 1 | Demand letter on a desk | staged prop, clearly a prop |
+| 2 | Patent number entry, claim split | live service |
+| 3 | Core log, funnel + seams + tasks | live service, real run |
+| 4 | Cloud Run Jobs console, tasks executing | GCP console |
+| 5 | Vertex AI request logs | GCP console |
+| 6 | Claim chart, row by row | live service |
+| 7 | /eval accuracy table | live service |
+
+Shots 4 and 5 are the "backend running on Google Cloud" proof the rules require,
+and they are also the most interesting shot in the film, which is convenient.
+
+## The per-limitation counts are not stable, and the script must not pretend they are
+
+The same reference charted twice against the same claim, on the same model at
+temperature 0, gave FULL 4 / PARTIAL 5 in one run and FULL 3 / PARTIAL 4 in the
+next. The split between "taught outright" and "taught in substance" is a judgment
+call sitting on a boundary, and it moves.
+
+So the narration never states those two counts from this script. Record the
+chart first, read the numbers off the frame that is actually in the video, and
+narrate those. A voiceover that says four while the screen says three is the kind
+of detail a judge notices and cannot un-notice.
+
+What IS stable, and safe to narrate:
+
+- the depth: 548 of 100,104 eligible
+- that a USPTO examiner applied this exact reference against this exact patent
+  as an anticipation rejection
+- that some limitations are taught, some in substance, and some not at all
+- the blinded accuracy figures, which come from a fixed-seed run and do not move
+
+## Rules for the edit
+
+- The emotional peak is the chart at roughly 2:30. Never the eval table.
+- Never end on the eval page.
+- No speed ramping over a terminal. The funnel counting down is the motion.
+- Under 4:00. If it runs long, cut from the engine section, never from the chart.

@@ -86,13 +86,35 @@ prompt.
 
 Full method, denominators and limits: [`ACCURACY.md`](ACCURACY.md).
 
-### The number that explains the architecture
+### The demo case, end to end
 
-For US 10,002,398 the reference a USPTO examiner actually applied as an
-anticipation rejection sits at **rank 6,426 of 149,721** eligible references.
+Run `10140422-8426b879`, a real Cloud Run execution.
 
-Top-50 retrieval never surfaces it. Neither does top-500. It is only found by a
-system willing to read several thousand candidates.
+US 10,140,422 "Progression analytics system" was prosecuted against
+US 8,265,955 "Methods and systems for assessing clinical outcomes", which a
+USPTO examiner applied as a category-X anticipation rejection.
+
+Blinded, without ever seeing the file history, Nightshift independently surfaced
+that same reference:
+
+| | |
+|---|---|
+| Eligible after the priority-date gate | 100,104 |
+| Read by Gemini | 2,000 |
+| **Depth of the examiner's reference** | **548** |
+| Wall time | 223 s across 10 Cloud Run tasks |
+| Cost | **$8.29** |
+
+Against the $5,000 to $15,000 and one to three weeks a firm quotes.
+
+Depth 548 is the argument. A tool that shows a human the top fifty results never
+surfaces this reference, and neither does one that shows the top five hundred.
+The two patents share almost no vocabulary, which is why keyword search misses it
+and why the judgment stage has to read rather than match.
+
+The case was chosen by `scripts/pick_demo_target.py`, which scores candidates on
+depth and on how much of the claim the chart actually carries, rather than by
+picking one that looked good. Scores are in `eval/demo-candidates.json`.
 
 ## Scope, stated up front
 
