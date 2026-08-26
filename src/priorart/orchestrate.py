@@ -33,9 +33,9 @@ SELECT
   p.disclosure,
   d.filing_date,
   d.priority_date,
-  ML.DISTANCE(t.tvec, c.embedding_v1, 'COSINE') AS distance,
+  ML.DISTANCE(t.tvec, c.{vcol}, 'COSINE') AS distance,
   ROW_NUMBER() OVER (
-    ORDER BY ML.DISTANCE(t.tvec, c.embedding_v1, 'COSINE')
+    ORDER BY ML.DISTANCE(t.tvec, c.{vcol}, 'COSINE')
   ) - 1 AS rank
 FROM t, `{vectors}` c
 JOIN `{dates}` d ON d.patent_id = c.patent_id
@@ -83,7 +83,8 @@ def prepare(target_id: str, n_candidates: int, scope: str = "G06Q") -> str:
 
     client = bigquery.Client(project=config.PROJECT_ID, location=config.LOCATION)
     tables = dict(
-        vectors=config.working_table(f"vectors_{suffix}"),
+        vectors=config.vector_table(suffix),
+        vcol=config.VECTOR_COLUMN,
         dates=config.working_table(f"dates_{suffix}"),
         patents=config.working_table(f"patents_{suffix}_clustered"),
     )

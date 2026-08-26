@@ -103,15 +103,17 @@ The USPTO publishes which references an examiner applied in a rejection, and aga
 
 Blinded, with the reference's number, title, assignee and dates stripped from the prompt: on references an examiner applied to anticipate, it finds them 97.5% of the time (n=40). On references applied for obviousness, 92.5% (n=40). On references the examiner never cited, drawn from the same corpus and passing the same date gate, it stays quiet 81.2% of the time (n=80). That control is what makes the first two numbers mean anything.
 
-And the number that explains why the architecture looks like this: in the demo case, the reference the examiner actually applied sits at depth 548 out of 100,104 eligible references. Nothing that shows a human the top fifty results finds it.
+And the number that explains why the architecture looks like this. Ranking the corpus with gemini-embedding-001, the strongest embedding available, a top-50 shortlist still misses 59.7% of the references examiners actually applied. Every commercial patent tool ranks a corpus and shows a person the top few dozen results, and no amount of ranking quality rescues that design. Reading 2,000 finds 83.9%.
 ```
 
 ### What I learned
 
 ```
-Retrieval quality was never the bottleneck I assumed it was. The prefilter is a 64-dimensional embedding, far too coarse to rank prior art precisely, and it still keeps 78.2% of anticipation references inside the top ten thousand. The judgment stage then misses only 2.5% of what reaches it.
+That measuring the pipeline in stages is what tells you where to spend.
 
-So the loss is almost entirely in retrieval, and the fix is not a better ranker. It is reading further down the list than anyone bothers to.
+Splitting recall into "did the prefilter keep the reference" and "did the model then flag it" showed the loss was almost entirely in retrieval: the model was missing 2.5% of what reached it while the prefilter was dropping 46%. That pointed at re-embedding the corpus with gemini-embedding-001, which took anticipation recall at 2,000 candidates from 54.0% to 83.9% and the median rank of an examiner's reference from 1,230 to 128.
+
+It also cost me my favourite demo. The case I had been showing sat at depth 548, and under the better prefilter it ranks 16, so it stopped demonstrating anything and had to be replaced. The honest argument turned out to be stronger than the anecdote: even with the best embedding available, a top-50 shortlist misses 59.7% of examiner-applied references. That is a property of the whole population, not one lucky patent.
 ```
 
 ### What's next for Nightshift

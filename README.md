@@ -27,15 +27,26 @@ priced out of reach of exactly the companies most often targeted.
 ## What makes it different
 
 Every existing tool is a **retrieval** system: it ranks a corpus and shows a
-human the top few dozen results. Published recall for that approach is 45 to 60%
-for keyword search and 70 to 85% for the best semantic search.
+human the top few dozen results.
 
-Nightshift is a **judgment** system. A coarse vector pass narrows the corpus, and
-then Gemini reads thousands of candidate references, not tens, deciding for each
-one whether it actually discloses each limitation of the asserted claim. The
-prefilter is not asked to be right. It is only asked not to lose the answer.
+That design has a ceiling, and it is measurable. Ranking this corpus with
+`gemini-embedding-001`, the strongest embedding available, **a top-50 shortlist
+still misses 59.7% of the references a USPTO examiner actually applied to
+anticipate a claim.** Better ranking does not fix it. Reading further down the
+list does.
 
-That trade is measured, not asserted. See below.
+So Nightshift is a **judgment** system. A vector pass narrows the corpus, then
+Gemini reads two thousand candidate references, not fifty, deciding for each one
+whether it discloses each limitation of the asserted claim. The prefilter is not
+asked to be right. It is only asked not to lose the answer.
+
+| Depth read | Anticipation references found |
+|---|---|
+| Top 20 | 26.6% |
+| **Top 50** (what a person is shown) | **40.3%** |
+| Top 100 | 48.4% |
+| Top 500 | 71.0% |
+| **Top 2,000** (what Nightshift reads) | **83.9%** |
 
 ## Measured results
 
@@ -44,17 +55,19 @@ BigQuery. Nothing here is seeded or simulated.
 
 ### Prefilter recall (the vector stage)
 
-Whether the coarse pass keeps the reference a USPTO examiner actually applied in
-a rejection, out of 171,695 candidates:
+Whether the vector pass keeps the reference an examiner actually applied, out of
+171,695 candidates, using `gemini-embedding-001` at 768 dimensions:
 
-| Citation category | n | recall@1k | @5k | @10k | @25k | median rank |
+| Citation category | n | @1k | @2k | @5k | @10k | median rank |
 |---|---|---|---|---|---|---|
-| **X** (anticipation, §102) | 124 | 46.8% | 64.5% | **78.2%** | 87.9% | 1,230 |
-| **Y** (obviousness, §103) | 973 | 30.4% | 53.4% | **66.3%** | 81.1% | 3,961 |
+| **X** (anticipation, §102) | 124 | 77.4% | **83.9%** | 91.1% | **93.5%** | **128** |
+| **Y** (obviousness, §103) | 973 | 59.7% | **67.9%** | 77.3% | **83.7%** | **482** |
 
-The embedding is 64-dimensional and would be useless for precision retrieval.
-It does not need to be precise. It needs to be a high-recall funnel in front of a
-model that reads what survives.
+This replaced Google Patents' `embedding_v1` (64 dimensions, from an unpublished
+model with no callable endpoint) after measuring both on the same gold pairs.
+Anticipation recall at 2,000 candidates went from 54.0% to 83.9%, and the median
+rank of an examiner's reference from 1,230 to 128. Both tables are kept so the
+comparison stays reproducible: `scripts/gate_recall_compare.sql`.
 
 ### Does it find what a patent examiner found?
 
@@ -72,45 +85,60 @@ gamed by flagging everything, so the same screener was run over references the
 examiner did not cite, drawn from the same corpus and passing the same
 priority-date gate.
 
-Composed with prefilter recall, end to end at 10,000 candidates:
+Composed with prefilter recall, at the 2,000 candidates the deployed service
+actually screens:
 
-| Category | Prefilter | x Screening | = End to end |
+| Category | Prefilter @2k | x Screening | = End to end |
 |---|---|---|---|
-| X (anticipation) | 78.2% | 97.5% | **76.2%** |
-| Y (obviousness) | 66.3% | 92.5% | **61.3%** |
+| X (anticipation) | 83.9% | 97.5% | **81.8%** |
+| Y (obviousness) | 67.9% | 92.5% | **62.8%** |
 
-The loss is almost entirely in retrieval, not judgment. The prefilter drops 21.8%
-of anticipation references before the model reads them; the model misses 2.5% of
-what reaches it. That is the argument for reading deeper rather than for a better
-prompt.
+On four of every five patents where a USPTO examiner found an anticipating
+reference, Nightshift independently finds that same reference without ever seeing
+the file history.
+
+The remaining loss is still in retrieval rather than judgment: at 2,000
+candidates the prefilter drops 16.1% of anticipation references before the model
+sees them, and the model then misses 2.5% of what reaches it. Upgrading the
+embedding cut that retrieval loss from 46.0% to 16.1%, and what is left sits in
+the same stage.
 
 Full method, denominators and limits: [`ACCURACY.md`](ACCURACY.md).
 
 ### The demo case, end to end
 
-Run `10140422-8426b879`, a real Cloud Run execution.
+Run `10163121-c398c4bc`, a real Cloud Run execution.
 
-US 10,140,422 "Progression analytics system" was prosecuted against
-US 8,265,955 "Methods and systems for assessing clinical outcomes", which a
-USPTO examiner applied as a category-X anticipation rejection.
+US 10,163,121 "System and method for targeted marketing and consumer resource
+management" was prosecuted against US 7,606,730 "System and method for a multiple
+merchant stored value card", which a USPTO examiner applied as a category-X
+anticipation rejection.
 
 Blinded, without ever seeing the file history, Nightshift independently surfaced
 that same reference:
 
 | | |
 |---|---|
-| Eligible after the priority-date gate | 100,104 |
+| In CPC G06Q | 171,694 |
+| Dropped as not prior art | 126,787 |
+| Eligible after the priority-date gate | 44,907 |
 | Read by Gemini | 2,000 |
-| **Depth of the examiner's reference** | **548** |
-| Wall time | 223 s across 10 Cloud Run tasks |
-| Cost | **$8.29** |
+| Closest art | 39 |
+| **Depth of the examiner's reference** | **218** |
+| Wall time | ~4 minutes across 10 Cloud Run tasks |
+| Cost | **$9.09** |
 
 Against the $5,000 to $15,000 and one to three weeks a firm quotes.
 
-Depth 548 is the argument. A tool that shows a human the top fifty results never
-surfaces this reference, and neither does one that shows the top five hundred.
-The two patents share almost no vocabulary, which is why keyword search misses it
-and why the judgment stage has to read rather than match.
+Depth 218 is past every shortlist a person is shown. The two patents share almost
+no vocabulary: one calls itself targeted marketing, the other a stored value
+card, and both describe accumulating loyalty value and redeeming it at a merchant
+point of sale. That is why keyword search misses it and why the judgment stage
+has to read rather than match.
+
+The target also demonstrates the eligibility gate by itself. It was **filed in
+2017 but claims priority to 2006**. Filtering on filing date would have searched
+eleven years of art that is not prior art at all.
 
 The case was chosen by `scripts/pick_demo_target.py`, which scores candidates on
 depth and on how much of the claim the chart actually carries, rather than by
@@ -242,10 +270,10 @@ python scripts/test_failure_modes.py              # 12 checks
 
 ```bash
 # Local, single process.
-python -m priorart.run 10140422 --candidates 200
+python -m priorart.run 10163121 --candidates 200
 
 # Distributed, after deploying (below).
-python -m priorart.orchestrate 10140422 --candidates 2000 --tasks 10
+python -m priorart.orchestrate 10163121 --candidates 2000 --tasks 10
 ```
 
 ### 6. Deploy

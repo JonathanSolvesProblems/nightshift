@@ -41,75 +41,117 @@ corpus, both have issued claim text, and both have an embedding.
 
 ## Result 1: prefilter recall (measured)
 
-Does the coarse vector stage keep the examiner's reference inside the candidate
-set, out of 171,695 corpus patents?
+Does the vector stage keep the examiner's reference inside the candidate set,
+out of 171,695 corpus patents?
 
-| Category | n | recall@1k | recall@5k | recall@10k | recall@25k | median rank |
+The corpus is embedded with **`gemini-embedding-001` at 768 dimensions**.
+
+| Category | n | @1k | @2k | @5k | @10k | median rank |
 |---|---|---|---|---|---|---|
-| **X** | 124 | 46.8% | 64.5% | **78.2%** | 87.9% | 1,230 |
-| **Y** | 973 | 30.4% | 53.4% | **66.3%** | 81.1% | 3,961 |
+| **X** (anticipation) | 124 | 77.4% | **83.9%** | 91.1% | **93.5%** | **128** |
+| **Y** (obviousness) | 973 | 59.7% | **67.9%** | 77.3% | **83.7%** | **482** |
 
-Reproduce: `scripts/gate_recall.sql`.
+Reproduce: `scripts/gate_recall_compare.sql`. The deployed service screens 2,000
+candidates, so the @2k column is the production figure.
 
-Read this as a ceiling on the full pipeline: the judgment stage can only find
-what the prefilter kept. It is also the justification for a wide judgment stage.
-Judging the top 100 would cap anticipation recall near 20%; judging 10,000 caps
-it at 78.2%.
+### The embedding was replaced, and the swap was measured before it was kept
 
-The embedding is `embedding_v1` from `google_patents_research.vector_db`, 64
-dimensions, produced by an unpublished model with no callable endpoint. New text
-cannot be projected into that space, so the query vector is the target patent's
-own stored vector. A 64-dimensional embedding is far too coarse for precision
-retrieval and entirely adequate as a high-recall funnel, which is the whole
-architectural argument.
+The original prefilter used `embedding_v1` from `google_patents_research`: 64
+dimensions, from an unpublished model with no callable endpoint. Both tables are
+retained so this comparison stays reproducible.
+
+| Prefilter | Cat | @1k | @2k | @5k | @10k | median rank |
+|---|---|---|---|---|---|---|
+| `embedding_v1` (64d) | X | 46.8% | 54.0% | 64.5% | 78.2% | 1,230 |
+| **`gemini-embedding-001` (768d)** | X | **77.4%** | **83.9%** | **91.1%** | **93.5%** | **128** |
+| `embedding_v1` (64d) | Y | 30.4% | 38.7% | 53.4% | 66.3% | 3,961 |
+| **`gemini-embedding-001` (768d)** | Y | **59.7%** | **67.9%** | **77.3%** | **83.7%** | **482** |
+
+The median rank of an examiner's anticipation reference fell from 1,230 to 128.
+
+## Result 2: what a shortlist misses, even at full retrieval quality
+
+This is the number the architecture rests on, and it is measured on the *better*
+embedding, not the worse one.
+
+| Depth read | X found | Y found |
+|---|---|---|
+| Top 20 | 26.6% | 15.3% |
+| **Top 50** | **40.3%** | **22.8%** |
+| Top 100 | 48.4% | 30.4% |
+| Top 500 | 71.0% | 50.7% |
+| **Top 2,000** | **83.9%** | **67.9%** |
+
+**A top-50 shortlist misses 59.7% of the references a USPTO examiner actually
+applied to anticipate a claim, and 77.2% of those applied for obviousness.**
+
+That is the case against the incumbent design in one line. Every commercial
+patent search tool ranks a corpus and shows a person the top few dozen results.
+Better ranking does not fix this: these figures already use the strongest
+embedding available, and the top 50 still misses three of every five killing
+references. Reading further down the list is what closes the gap, and reading
+2,000 of them is not something a person can do.
 
 ## The demo case, end to end
 
-Run `10140422-8426b879`, a real Cloud Run execution against real USPTO data.
+Run `10163121-c398c4bc`, a real Cloud Run execution against real USPTO data.
 
-**Target:** US 10,140,422, "Progression analytics system", priority 2013-03-15.
-**What the USPTO did:** during prosecution an examiner applied US 8,265,955,
-"Methods and systems for assessing clinical outcomes", against it as a
+**Target:** US 10,163,121, "System and method for targeted marketing and consumer
+resource management". Filed 2017-10-03, claiming priority to **2006-07-27**.
+**What the USPTO did:** during prosecution an examiner applied US 7,606,730,
+"System and method for a multiple merchant stored value card", against it as a
 category-X anticipation rejection.
 **What Nightshift did:** blinded, without ever seeing the file history, it
 independently surfaced that same reference.
 
 | | |
 |---|---|
-| In CPC G06Q | 171,723 |
-| Eligible after the priority-date gate | 100,104 |
+| In CPC G06Q | 171,694 |
+| Dropped as not prior art | 126,787 |
+| Eligible after the priority-date gate | 44,907 |
 | Read by Gemini | 2,000 |
-| Worth reading | 208 |
-| **Depth of the examiner's reference** | **548 of 100,104** |
-| Wall time | 223 s across 10 Cloud Run tasks |
-| Cost | **$8.29** |
+| Closest art | 39 |
+| **Depth of the examiner's reference** | **218 of 44,907** |
+| Wall time | ~4 minutes across 10 Cloud Run tasks |
+| Cost | **$9.09** |
 
 Against the $5,000 to $15,000 and one to three weeks a firm quotes for the same
 question.
 
-Depth 548 is the whole argument. A tool that ranks the corpus and shows a human
-the top fifty never surfaces this reference. Neither does one that shows the top
-five hundred.
+Depth 218 is beyond every shortlist a person is shown. A tool displaying the top
+50 misses it; so does one displaying the top 100. That is not an anecdote about
+this case, it is the population result above: a top-50 shortlist misses 59.7% of
+examiner-applied anticipation references.
 
-The two patents also share almost no vocabulary: the claim calls itself a
-progression analytics system and the reference calls itself a method for
-assessing clinical outcomes. That is why keyword search does not find it, and it
-is why the judgment stage has to read rather than match.
+The two patents share almost no vocabulary. The claim calls itself targeted
+marketing and consumer resource management; the reference calls itself a
+multiple merchant stored value card. Both describe accumulating loyalty value
+and redeeming it at a merchant point of sale.
+
+This target also demonstrates the eligibility gate on its own. It was **filed in
+2017 but claims priority to 2006**, an eleven-year gap. Filtering on filing date
+would have searched eleven years of art that is not prior art at all, and the
+gate correctly drops 126,787 of 171,694 candidates.
 
 ### How this case was chosen
 
-It was selected by `scripts/pick_demo_target.py`, which scores candidates rather
-than picking one that looks good. It ranks gold pairs where an examiner applied a
+Selected by `scripts/pick_demo_target.py`, which scores candidates rather than
+picking one that looks good. It ranks gold pairs where an examiner applied a
 category-X reference, computes how deep that reference sits, charts it, and
-counts how much of the claim it teaches. The output is in
-`eval/demo-candidates.json`.
+counts how much of the claim it teaches. Output in `eval/demo-candidates.json`.
 
-The trade is real and visible in that file. The strongest chart in the candidate
-set (US 10,310,505) sits at rank 35, where ordinary retrieval would find it
-anyway and the depth argument collapses. The deepest find (US 10,229,396 at rank
-6,313) charts no limitations as fully taught. This case was chosen because it is
-deep enough that no searcher reads to it and strong enough that the chart says
-something, including the limitations it says are not taught at all.
+The trade is visible in that file, and it got harder after the embedding
+upgrade rather than easier. Better retrieval pulls most examiner references
+toward the top: the strongest charts in the candidate set now sit at ranks 0, 3,
+9 and 16, where ordinary retrieval finds them anyway and the depth argument
+collapses. The deepest find (US 10,229,396 at rank 1,129) charts no limitations
+as fully taught. This case was chosen because it is deep enough that no shortlist
+reaches it and substantial enough that six of seven limitations have a
+counterpart.
+
+An earlier version of this document used a different case at depth 548. Under
+the upgraded prefilter that same reference ranks 16, so the case no longer
+demonstrated anything and was replaced rather than re-described.
 
 ### One caveat about the per-limitation counts
 
@@ -124,26 +166,19 @@ identity of the reference, and the fact that an examiner applied it.
 
 ## Worked example: why depth is the whole point
 
-US 10,002,398, "System for facilitating real estate transaction". During
-prosecution a USPTO examiner applied US 8,433,650 against it as a category-X
-anticipation reference.
+An early run of this repository returned zero findings. It screened only the top
+250 candidates, which was well short of the then-median rank of 1,230 for
+category-X references. The fix was not a better prompt. It was reading deeper.
 
-Where does that reference sit when the corpus is ranked by similarity to the
-target?
+That episode is worth keeping because it is the argument in miniature, and
+because the reflex it corrects survives the retrieval upgrade. With
+`gemini-embedding-001` the median rank fell to 128, which makes a shallow read
+look far more defensible than it is: the median is not the problem. The tail is.
+Half of all anticipation references still sit past rank 128, and 59.7% sit past
+rank 50.
 
-| | |
-|---|---|
-| Eligible prior art after the priority-date gate | 149,721 |
-| Rank of the reference the examiner actually used | **6,426** |
-
-A tool that ranks the corpus and shows a human the top 50 does not surface this
-reference. Neither does one that shows the top 500. It is only found by a system
-willing to actually read several thousand candidates, which is what separates a
-judgment pipeline from a retrieval pipeline.
-
-This is also why an early run of this repository returned zero hits: it screened
-only the top 250, which is well short of the measured median rank of 1,230 for
-category-X references. The fix was not a better prompt. It was screening deeper.
+A better retriever moves the median. It does not remove the need to read the
+tail, and the tail is where an examiner's reference is as likely to be as not.
 
 ## Model selection, measured rather than assumed
 
@@ -188,24 +223,34 @@ CPC class, and passing the same priority-date gate. These are plausible
 neighbours, not random junk, which is why 18.8% is the honest figure rather than
 something near zero.
 
-## Result 3: end-to-end recall (composed)
+## Result 4: end-to-end recall (composed)
 
 The two measured stages multiply. A reference is found only if the prefilter
 keeps it and the screener then flags it.
 
-| Category | Prefilter @10k | x Screening | = End to end @10k |
+At the 2,000 candidates the deployed service actually screens:
+
+| Category | Prefilter @2k | x Screening | = End to end |
 |---|---|---|---|
-| X (anticipation) | 78.2% | 97.5% | **76.2%** |
-| Y (obviousness) | 66.3% | 92.5% | **61.3%** |
+| X (anticipation) | 83.9% | 97.5% | **81.8%** |
+| Y (obviousness) | 67.9% | 92.5% | **62.8%** |
 
-Read plainly: on roughly three of every four patents where a USPTO examiner
-found an anticipating reference, Nightshift independently finds that same
-reference, without ever seeing the file history.
+At 10,000:
 
-The loss is almost entirely in retrieval, not in judgment. The 64-dimensional
-prefilter drops 21.8% of anticipation references before the model ever reads
-them, while the model itself misses only 2.5% of what reaches it. That is the
-argument for screening deeper rather than for a better prompt.
+| Category | Prefilter @10k | x Screening | = End to end |
+|---|---|---|---|
+| X (anticipation) | 93.5% | 97.5% | **91.2%** |
+| Y (obviousness) | 83.7% | 92.5% | **77.4%** |
+
+Read plainly: on four of every five patents where a USPTO examiner found an
+anticipating reference, Nightshift independently finds that same reference,
+without ever seeing the file history.
+
+The loss is still overwhelmingly in retrieval rather than judgment. At 2,000
+candidates the prefilter drops 16.1% of anticipation references before the model
+sees them; the model then misses 2.5% of what reaches it. Upgrading the embedding
+cut the retrieval loss from 46.0% to 16.1% at that depth, which is why it was
+worth doing, and the remaining loss still sits in the same stage.
 
 ## Why the eligibility gate is on filing date, not grant date
 

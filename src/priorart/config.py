@@ -39,3 +39,25 @@ DEFAULT_SCAN_CEILING_GB = float(os.environ.get("PRIOR_ART_SCAN_CEILING_GB", "150
 def working_table(name: str) -> str:
     """Fully qualified name of a table in my own dataset."""
     return f"{PROJECT_ID}.{DATASET}.{name}"
+
+
+# Which embedding the prefilter ranks with.
+#
+# The original `embedding_v1` from Google Patents Public Data is 64 dimensions
+# from an unpublished model with no callable endpoint. gemini-embedding-001 at
+# 768 dimensions replaced it after a measured comparison on the same gold pairs:
+# recall at 2,000 candidates went from 54.0% to 83.9% for anticipation
+# references, and the median rank of an examiner's reference fell from 1,230
+# to 128. See ACCURACY.md.
+#
+# Both tables are kept so the comparison stays reproducible.
+VECTOR_TABLE = os.environ.get("PRIOR_ART_VECTORS", "vectors_gemini_g06q")
+VECTOR_COLUMN = os.environ.get("PRIOR_ART_VECTOR_COL", "embedding")
+
+
+def vector_table(scope: str = "g06q") -> str:
+    """The vector table for a scope, honouring the override."""
+    name = VECTOR_TABLE
+    if "{scope}" in name:
+        name = name.format(scope=scope.lower())
+    return working_table(name)

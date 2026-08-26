@@ -223,7 +223,8 @@ async function tick(){
 
   set("corpus", run.corpus_size); set("dropped", run.dropped_not_prior_art);
   set("family", run.dropped_same_family); set("eligible", run.eligible);
-  set("screened", run.screened); set("hot", run.strong); set("partial", run.partial);
+  set("screened", run.screened); set("closest", run.closest);
+  set("hot", run.strong); set("partial", run.partial);
 
   // Strata are painted once: the corpus does not change while a run is in flight.
   const core = document.getElementById("core");
@@ -252,7 +253,7 @@ async function tick(){
   // place only if a seam is rare, so the strongest references are drawn and the
   // count that was not drawn is stated in the caption rather than hidden.
   core.querySelectorAll(".seam").forEach(e => e.remove());
-  const strong = (d.findings||[]).filter(f => (f.relevance||0) >= 2);
+  const strong = (d.findings||[]).filter(f => (f.relevance||0) >= 3);
   const deepest = strong.reduce((a,f) => Math.max(a, f.rank||0), 0);
   const CAP = 12;
   const drawn = strong
@@ -290,7 +291,7 @@ async function tick(){
       ? `<a href="/chart/${RID}?ref=${esc(f.patent_id)}">US ${esc(f.patent_id)}</a>`
       : `US ${esc(f.patent_id)}`}</td>`+
     `<td class="n num">${esc((f.filing_date||"").slice(0,4))}</td>`+
-    `<td><span class="tier ${(f.relevance||0)>=2?"hot":""}">${(f.relevance||0)>=2?"worth reading":"partial"}</span></td>`+
+    `<td><span class="tier ${(f.relevance||0)>=3?"hot":""}">${(f.relevance||0)>=3?"closest":((f.relevance||0)>=2?"worth reading":"partial")}</span></td>`+
     `<td class="n num">${n((f.limitations_disclosed||[]).length)}</td>`+
     `<td>${esc((f.summary||"").slice(0,150))}</td></tr>`
   ).join("");
@@ -421,8 +422,17 @@ def api_run(run_id: str):
     # Screening is deliberately generous because it decides what gets read
     # closely, so the raw flagged count overstates what is worth an attorney's
     # time. Relevance 2+ addresses part of the claimed approach; 1 is same field.
-    run["strong"] = sum(1 for f in all_findings if (f.get("relevance") or 0) >= 2)
-    run["partial"] = run["findings"] - run["strong"]
+    # Three tiers, because the retrieval upgrade made the top one meaningful.
+    #
+    # On the 64-dimensional prefilter, relevance 3 was vanishingly rare and the
+    # useful line sat at 2. With gemini-embedding-001 the candidate window is
+    # dense enough that 552 of 1,375 screened clear relevance 2, which is not a
+    # shortlist anybody can work from, while 39 clear relevance 3. The tier that
+    # matters moved, so the reporting moved with it rather than continuing to
+    # headline a number that had stopped being useful.
+    run["closest"] = sum(1 for f in all_findings if (f.get("relevance") or 0) >= 3)
+    run["strong"] = sum(1 for f in all_findings if (f.get("relevance") or 0) == 2)
+    run["partial"] = run["findings"] - run["closest"] - run["strong"]
     return JSONResponse({"run": run, "shards": shards, "findings": all_findings[:80]})
 
 
@@ -458,7 +468,8 @@ def run_page(run_id: str):
         <dd class="num minus" id=family>&mdash;</dd>
         <dt class=keep>eligible as prior art</dt><dd class="num keep" id=eligible>&mdash;</dd>
         <dt>read by Gemini</dt><dd class=num id=screened>&mdash;</dd>
-        <dt class=found>worth reading</dt><dd class="num found" id=hot>&mdash;</dd>
+        <dt class=found>closest art</dt><dd class="num found" id=closest>&mdash;</dd>
+        <dt>worth reading</dt><dd class=num id=hot>&mdash;</dd>
         <dt>partial overlap</dt><dd class=num id=partial>&mdash;</dd>
       </dl>
       <div class=lip>
@@ -583,9 +594,10 @@ def chart_page(run_id: str, ref: str | None = None):
       Surfaced at depth <span class=num>{cached.get('rank',0):,}</span> of
       <span class=num>{run.get('eligible',0):,}</span> eligible references.
       Of <span class=num>{total}</span> limitations,
-      <span class=num>{full}</span> are taught by this reference and
-      <span class=num>{partial}</span> are taught in substance with narrower
-      claim wording.
+      <span class=num>{full}</span> {"is" if full == 1 else "are"} taught by this
+      reference and <span class=num>{partial}</span>
+      {"is" if partial == 1 else "are"} taught in substance with narrower claim
+      wording.
     </div>
   </div>
   {rows}

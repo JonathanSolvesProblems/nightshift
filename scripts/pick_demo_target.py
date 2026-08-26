@@ -46,14 +46,14 @@ WITH pairs AS (
   LIMIT @pairs
 ),
 tv AS (
-  SELECT p.target, v.embedding_v1 AS tvec, d.priority_date
+  SELECT p.target, v.{vcol} AS tvec, d.priority_date
   FROM pairs p
   JOIN `{vectors}` v ON v.patent_id = p.target
   JOIN `{dates}` d ON d.patent_id = p.target
 ),
 gold AS (
   SELECT p.target, p.ref,
-         ML.DISTANCE(tv.tvec, vr.embedding_v1, 'COSINE') AS gold_dist,
+         ML.DISTANCE(tv.tvec, vr.{vcol}, 'COSINE') AS gold_dist,
          tv.tvec, tv.priority_date
   FROM pairs p
   JOIN tv ON tv.target = p.target
@@ -61,7 +61,7 @@ gold AS (
 )
 SELECT
   g.target, g.ref,
-  COUNTIF(ML.DISTANCE(g.tvec, c.embedding_v1, 'COSINE') < g.gold_dist
+  COUNTIF(ML.DISTANCE(g.tvec, c.{vcol}, 'COSINE') < g.gold_dist
           AND d.filing_date < g.priority_date) AS rank_pos,
   COUNTIF(d.filing_date < g.priority_date) AS eligible
 FROM gold g
@@ -91,7 +91,8 @@ def main() -> int:
     sql = RANK_SQL.format(
         gold=config.working_table("gold_pairs"),
         patents=config.working_table("patents_g06q_clustered"),
-        vectors=config.working_table("vectors_g06q"),
+        vectors=config.vector_table("g06q"),
+        vcol=config.VECTOR_COLUMN,
         dates=config.working_table("dates_g06q"),
     )
     job = client.query(

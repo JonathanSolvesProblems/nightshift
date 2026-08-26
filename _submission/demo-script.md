@@ -27,30 +27,30 @@ produced, fix that before recording anything.
 
 ## 0:22 – 0:40 · One action, then walk away.
 
-*Patent number entered. "Sink a borehole" clicked. Claim 1 splits into eleven
+*Patent number entered. "Sink a borehole" clicked. Claim 1 splits into seven
 limitations. Cut to the core log page.*
 
-> This is US 10,140,422. Claim 1 breaks into eleven limitations, and every US
+> This is US 10,163,121. Claim 1 breaks into seven limitations, and every US
 > patent in this class that predates its priority date is now eligible prior art.
 >
-> A hundred thousand of them.
+> Forty-four thousand of them.
 
 ## 0:40 – 1:35 · The engine, live, split screen.
 
 *Left: the core log, funnel counting down, seams appearing at depth, tasks
 lighting up. Right: the actual Cloud Run Jobs console and Vertex AI logs.*
 
-> A hundred and seventy-one thousand patents in the class. Fifty-two percent of
-> them claim priority earlier than their own filing date, so filtering on grant
-> date would be wrong in both directions. Filed after the priority date, and
-> they are not prior art at all: those drop.
+> A hundred and seventy-one thousand patents in the class. This one was filed in
+> 2017 but claims priority back to 2006, so anything filed after 2006 is not
+> prior art against it at all. A hundred and twenty-six thousand of them drop on
+> that rule alone.
 >
-> A hundred thousand survive. Gemini 3.5 Flash reads two thousand of them, one
+> Forty-four thousand survive. Gemini 3.5 Flash reads two thousand of them, one
 > call per patent, against every limitation, spread across ten Cloud Run tasks
 > pulling shards from BigQuery.
 >
 > The bands are the corpus by filing decade. The bright lines are seams: the
-> references worth an attorney's time, marked at the depth they were found.
+> closest art, marked at the depth it was found.
 
 ## 1:35 – 1:55 · The async beat.
 
@@ -65,10 +65,11 @@ lighting up. Right: the actual Cloud Run Jobs console and Vertex AI logs.*
 
 > Here is what it found, and here is why it matters.
 >
-> US 8,265,955, filed in 2011, two years before this patent's priority date. The
-> claim calls itself a progression analytics system. The reference calls itself
-> a method for assessing clinical outcomes. They share almost no vocabulary,
-> which is exactly why a keyword search does not find this.
+> US 7,606,730, filed in 2002, four years before this patent's priority date. The
+> claim calls itself targeted marketing and consumer resource management. The
+> reference calls itself a multiple merchant stored value card. They share almost
+> no vocabulary, and both describe accumulating loyalty value and redeeming it at
+> a merchant point of sale. That is exactly why a keyword search does not find it.
 >
 > [READ THE COUNTS OFF THE RECORDED CHART. Do not narrate them from this script.]
 > Limitations taught outright. More taught in substance, where the claim recites
@@ -83,17 +84,19 @@ lighting up. Right: the actual Cloud Run Jobs console and Vertex AI logs.*
 
 *The /eval page.*
 
-> It sat at depth 548 of a hundred thousand. Nothing that shows a human the top
-> fifty results finds it.
+> It sat at depth 218. And this is not my opinion of my own work: a USPTO
+> examiner applied that exact reference against that exact patent, as an
+> anticipation rejection, during prosecution. Nightshift found it without ever
+> seeing the file history.
 >
-> And this is not my opinion of my own work. A USPTO examiner applied that exact
-> reference against that exact patent, as an anticipation rejection, during
-> prosecution. Nightshift found it without ever seeing the file history.
+> That is not luck on one case. Ranked by the best embedding available, a top
+> fifty shortlist still misses fifty-nine percent of the references examiners
+> actually applied. Reading two thousand finds eighty-four percent of them.
 >
-> Across forty of those cases, blinded, it re-found the examiner's anticipation
-> reference ninety-seven and a half percent of the time. Against references the
-> examiner never cited, it stays quiet eighty-one percent of the time. That
-> second number is what makes the first one mean anything.
+> And blinded, across forty of those cases, it re-found the examiner's
+> anticipation reference ninety-seven and a half percent of the time, while
+> staying quiet on eighty-one percent of references the examiner never cited.
+> That second number is what makes the first one mean anything.
 
 ## 3:40 – 4:00 · Close.
 
@@ -136,7 +139,7 @@ of detail a judge notices and cannot un-notice.
 
 What IS stable, and safe to narrate:
 
-- the depth: 548 of 100,104 eligible
+- the depth: 218 of 44,907 eligible
 - that a USPTO examiner applied this exact reference against this exact patent
   as an anticipation rejection
 - that some limitations are taught, some in substance, and some not at all

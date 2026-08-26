@@ -115,11 +115,20 @@ Numbers shown are an actual run against US 10,002,398.
 
 ## The one number that explains the shape
 
-For US 10,002,398 the reference a USPTO examiner actually applied as a
-category-X anticipation rejection sits at **rank 6,426 of 149,721** eligible
-references.
+Ranking this corpus with `gemini-embedding-001`, the strongest embedding
+available, **a top-50 shortlist still misses 59.7% of the references a USPTO
+examiner actually applied to anticipate a claim.**
 
-A tool that ranks the corpus and shows a human the top 50 never surfaces it.
-Neither does one that shows the top 500. It is only found by a system willing to
-read several thousand candidates, which is the difference between a retrieval
-pipeline and a judgment pipeline, and the reason the fan-out exists at all.
+| Depth read | Anticipation references found |
+|---|---|
+| Top 20 | 26.6% |
+| Top 50 | 40.3% |
+| Top 100 | 48.4% |
+| Top 500 | 71.0% |
+| Top 2,000 | 83.9% |
+
+That is the whole reason the fan-out exists. Every commercial patent tool ranks a
+corpus and shows a person the top few dozen results, and no amount of ranking
+quality rescues that design: these figures are already measured on the better
+embedding. Reading two thousand references is not something a person does, which
+is why it is a background job across ten Cloud Run tasks rather than a search box.

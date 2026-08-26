@@ -3,14 +3,21 @@
 This stage is not asked to be right. It is asked not to lose the answer.
 
 Measured recall against references a USPTO examiner applied in a rejection,
-out of 171,695 corpus patents (see ACCURACY.md):
+out of 171,695 corpus patents, using gemini-embedding-001 at 768 dimensions
+(see ACCURACY.md):
 
-    category X (anticipation)  78.2% @10k    median rank 1,230
-    category Y (obviousness)   66.3% @10k    median rank 3,961
+    category X (anticipation)  83.9% @2k    93.5% @10k    median rank 128
+    category Y (obviousness)   67.9% @2k    83.7% @10k    median rank 482
 
-The embedding is 64 dimensions, far too coarse to rank prior art precisely, and
-entirely adequate as a high-recall funnel in front of a model that reads what
-survives. That trade is the architecture.
+This replaced Google Patents' `embedding_v1`, which is 64 dimensions from an
+unpublished model with no callable endpoint. On the same gold pairs that scored
+54.0% @2k for anticipation against 83.9% here, with a median rank of 1,230
+against 128.
+
+The important number is not either of those. It is that a top-50 shortlist, even
+ranked by the better embedding, still misses 59.7% of the references an examiner
+actually applied. Retrieval quality was never going to close that gap; reading
+further down the list is what closes it.
 
 Two hard filters run before ranking is ever considered:
 
@@ -63,7 +70,7 @@ class SearchResult:
 TARGET_CTE = """
 WITH t AS (
   SELECT
-    v.embedding_v1 AS tvec,
+    v.{vcol} AS tvec,
     d.priority_date AS t_priority,
     p.title AS t_title
   FROM `{vectors}` v
@@ -96,7 +103,7 @@ SELECT
   p.disclosure,
   d.filing_date,
   d.priority_date,
-  ML.DISTANCE(t.tvec, c.embedding_v1, 'COSINE') AS distance
+  ML.DISTANCE(t.tvec, c.{vcol}, 'COSINE') AS distance
 FROM t, `{vectors}` c
 JOIN `{dates}` d ON d.patent_id = c.patent_id
 JOIN `{patents}` p ON p.patent_id = c.patent_id
@@ -113,16 +120,19 @@ LIMIT @topn
 def retrieve(target: str, top_n: int = 2000, scope: str = "G06Q") -> SearchResult:
     """Rank eligible prior art by similarity to the target patent.
 
-    The query vector is the target's own stored embedding. `embedding_v1` comes
-    from an unpublished model with no callable endpoint, so arbitrary text cannot
-    be projected into that space; patent-to-patent similarity is what the data
-    actually supports.
+    The query vector is the target's own stored embedding, so this is
+    patent-to-patent similarity. That was forced by the original `embedding_v1`,
+    which had no callable endpoint and so could never accept new text. It is now
+    a choice rather than a constraint: gemini-embedding-001 is callable, so a
+    future version can accept a claim, a product description, or a disclosure
+    that is not yet a patent at all.
     """
     client = bigquery.Client(project=config.PROJECT_ID, location=config.LOCATION)
     suffix = scope.lower()
 
     tables = dict(
-        vectors=config.working_table(f"vectors_{suffix}"),
+        vectors=config.vector_table(suffix),
+        vcol=config.VECTOR_COLUMN,
         dates=config.working_table(f"dates_{suffix}"),
         patents=config.working_table(f"patents_{suffix}_clustered"),
     )
