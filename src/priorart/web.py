@@ -150,6 +150,17 @@ h2{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink3)
   background:var(--seam);animation:cut 1.6s ease-in-out infinite}
 @keyframes cut{0%,100%{opacity:.25}50%{opacity:1}}
 
+/* The cut face. Every particle is a candidate that was actually screened and
+   every lane is a real Cloud Run task, so the flow rate is the job's rate. When
+   the run finishes the canvas empties and stops; it is a window onto work, not
+   a loading spinner. */
+.flowwrap{position:relative;margin-top:var(--s2);border:1px solid var(--hairline);
+  background:var(--well);box-shadow:inset 0 2px 5px rgba(0,0,0,.35)}
+#flow{display:block;width:100%;height:190px}
+.flowlab{position:absolute;left:var(--s2);top:var(--s1);color:var(--ink3);
+  font-size:9.5px;letter-spacing:.14em;text-transform:uppercase}
+.flowlab.r{left:auto;right:var(--s2)}
+
 /* shard tasks: witness marks, not status pills */
 .tasks{display:flex;flex-wrap:wrap;gap:3px;margin-top:var(--s2)}
 .tk{width:100%;max-width:22px;height:8px;background:var(--raised);
@@ -351,6 +362,15 @@ async function tick(){
     ? drawn.length + " strongest of " + strong.length + " marked, thickness by limitations matched"
     : (strong.length ? strong.length + " marked, thickness by limitations matched" : "");
 
+  feed(d.shards, run.findings || 0);
+  const note = document.getElementById("flownote");
+  if(note) note.textContent = reduce
+    ? "motion disabled by your system settings"
+    : (run.status === "done"
+        ? "run complete, " + n(run.screened) + " candidates read across " +
+          (d.shards.length || 0) + " tasks"
+        : "one mark per four candidates read, one bright mark per finding");
+
   const done = d.shards.filter(s => s.status === "done").length;
   document.getElementById("tasks").innerHTML = d.shards.map(s =>
     `<div class="tk ${s.status==="done"?"done":"run"}" title="task ${s.index}: ${s.screened}/${s.assigned}"></div>`
@@ -374,6 +394,105 @@ async function tick(){
   if(chart) chart.style.display = (run.strong > 0) ? "inline" : "none";
 }
 function set(id,v){ const e = document.getElementById(id); if(e) e.textContent = n(v); }
+
+/* ------------------------------------------------------------------ *
+ * The cut face.
+ *
+ * One lane per Cloud Run task. A particle is emitted for candidates that
+ * were actually screened since the last poll, so the flow rate IS the
+ * job's rate: when a shard stalls its lane goes quiet, and when the run
+ * ends the canvas drains and the loop stops. Nothing is emitted on a
+ * timer, because a flow that keeps flowing after the work stopped would
+ * be a lie told in animation.
+ *
+ * Canvas rather than a 3D library: this is a 2D particle flow driven by
+ * counts, and a WebGL dependency would be weight without benefit on a
+ * page a judge loads once.
+ * ------------------------------------------------------------------ */
+const cv = document.getElementById("flow");
+const cx = cv ? cv.getContext("2d") : null;
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let parts = [], lanes = 1, prevScreened = {}, prevFound = 0, seen = 0, running = false;
+const CSSVAR = k => getComputedStyle(document.body).getPropertyValue(k).trim();
+
+function fit(){
+  if(!cv) return;
+  const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1;
+  cv.width = r.width * d; cv.height = r.height * d;
+  cx.setTransform(d,0,0,d,0,0);
+}
+addEventListener("resize", fit);
+
+/* Emission is derived from real progress, never invented. */
+function feed(shards, findings){
+  if(!cv || reduce) return;
+  lanes = Math.max(1, shards.length);
+  shards.forEach(s => {
+    const before = prevScreened[s.index] || 0;
+    const delta  = Math.max(0, (s.screened || 0) - before);
+    prevScreened[s.index] = s.screened || 0;
+    // One particle per 4 candidates keeps a 2,000-candidate run legible
+    // rather than a solid wall.
+    for(let i = 0; i < Math.min(40, Math.ceil(delta / 4)); i++){
+      parts.push({ lane: s.index % lanes, x: 0,
+                   v: 0.55 + Math.random() * 0.75,
+                   j: (Math.random() - 0.5) * 7, hit: false });
+    }
+  });
+  const gained = Math.max(0, findings - prevFound);
+  prevFound = findings;
+  for(let i = 0; i < Math.min(18, gained); i++){
+    parts.push({ lane: Math.floor(Math.random() * lanes), x: 0,
+                 v: 0.5 + Math.random() * 0.4,
+                 j: (Math.random() - 0.5) * 5, hit: true });
+  }
+  if(parts.length && !running){ running = true; requestAnimationFrame(draw); }
+}
+
+function draw(){
+  if(!cv){ running = false; return; }
+  const w = cv.clientWidth, h = cv.clientHeight;
+  const ink3 = CSSVAR("--ink3") || "#6F7873";
+  const seam = CSSVAR("--seam") || "#8CBF3F";
+  const hair = CSSVAR("--hairline") || "#3A413E";
+  cx.clearRect(0,0,w,h);
+
+  // lane rules: the shards, drawn as the ground each task is cutting
+  const pad = 16, laneH = (h - pad*2) / lanes;
+  cx.strokeStyle = hair; cx.lineWidth = 1;
+  for(let i = 0; i <= lanes; i++){
+    const y = Math.round(pad + i*laneH) + .5;
+    cx.beginPath(); cx.moveTo(pad, y); cx.lineTo(w - pad, y); cx.stroke();
+  }
+
+  let alive = 0;
+  for(const p of parts){
+    p.x += p.v;
+    if(p.x > w - pad*2){ continue; }
+    alive++;
+    const y = pad + p.lane*laneH + laneH/2 + p.j;
+    if(p.hit){
+      cx.fillStyle = seam;
+      cx.fillRect(pad + p.x - 3, y - 1.5, 6, 3);
+    } else {
+      cx.globalAlpha = .5;
+      cx.fillStyle = ink3;
+      cx.fillRect(pad + p.x, y - 1, 2, 2);
+      cx.globalAlpha = 1;
+    }
+  }
+  parts = parts.filter(p => p.x <= w - pad*2);
+
+  if(alive){ requestAnimationFrame(draw); }
+  else { running = false; cx.clearRect(0,0,w,h);
+         cx.strokeStyle = hair; cx.lineWidth = 1;
+         for(let i = 0; i <= lanes; i++){
+           const y = Math.round(pad + i*((h-pad*2)/lanes)) + .5;
+           cx.beginPath(); cx.moveTo(pad, y); cx.lineTo(w-pad, y); cx.stroke();
+         } }
+}
+
+fit();
 tick(); setInterval(tick, 2000);
 """
 
@@ -632,6 +751,15 @@ def run_page(run_id: str):
         <dt>worth reading</dt><dd class=num id=hot>&mdash;</dd>
         <dt>partial overlap</dt><dd class=num id=partial>&mdash;</dd>
       </dl>
+      <div class=lip>
+        <h2>The cut face</h2>
+        <div class=flowwrap>
+          <canvas id=flow></canvas>
+          <div class=flowlab>eligible corpus</div>
+          <div class="flowlab r">closest art</div>
+        </div>
+        <div class=note id=flownote style="font-size:11px"></div>
+      </div>
       <div class=lip>
         <h2>Cloud Run tasks</h2>
         <div class=tasks id=tasks></div>
