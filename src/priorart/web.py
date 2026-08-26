@@ -124,6 +124,32 @@ h2{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink3)
 .tick{position:absolute;left:0;white-space:nowrap}
 .corewrap{display:grid;grid-template-columns:1fr 52px;gap:var(--s2)}
 
+/* The drill string: the pipeline as stages of a rig, surface to bit.
+   Every value on it is read from the run, and a stage only lights when that
+   stage has actually done something. Nothing here animates on a timer. */
+.string{display:grid;grid-template-columns:repeat(6,1fr);gap:0;margin-top:var(--s2);
+  border:1px solid var(--hairline);background:var(--well);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.35)}
+.stg{position:relative;padding:var(--s2) var(--s2) var(--s2) var(--s3);
+  border-right:1px solid var(--hairline);opacity:.34;
+  transition:opacity 420ms var(--ease),background 420ms var(--ease)}
+.stg:last-child{border-right:0}
+.stg.live{opacity:1;background:rgba(140,191,63,.05)}
+.stg.done{opacity:1}
+.stg-n{font:600 20px/1.1 "Martian Mono",ui-monospace,monospace;
+  font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+.stg.live .stg-n{color:var(--seam)}
+.stg-l{color:var(--ink3);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  margin-top:5px;line-height:1.35}
+/* the bit: a mark that travels to whichever stage is currently cutting */
+.stg::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--seam);transform:scaleY(0);transform-origin:top;
+  transition:transform 420ms var(--ease)}
+.stg.live::before,.stg.done::before{transform:scaleY(1)}
+.stg.live::after{content:"";position:absolute;left:-1px;top:0;bottom:0;width:2px;
+  background:var(--seam);animation:cut 1.6s ease-in-out infinite}
+@keyframes cut{0%,100%{opacity:.25}50%{opacity:1}}
+
 /* shard tasks: witness marks, not status pills */
 .tasks{display:flex;flex-wrap:wrap;gap:3px;margin-top:var(--s2)}
 .tk{width:100%;max-width:22px;height:8px;background:var(--raised);
@@ -225,6 +251,28 @@ async function tick(){
   set("family", run.dropped_same_family); set("eligible", run.eligible);
   set("screened", run.screened); set("closest", run.closest);
   set("hot", run.strong); set("partial", run.partial);
+
+  // The drill string. A stage is "done" when its work finished and "live" when
+  // it is the one currently cutting. Both are derived from run state, never from
+  // a timer: if the run stalls, the rail stalls with it, which is the point.
+  const nLim = (run.limitations||[]).length;
+  const tasksDone = d.shards.filter(s => s.status === "done").length;
+  const tasksTotal = d.shards.length || run.tasks || 0;
+  const stages = [
+    { n: nLim,          done: nLim > 0 },
+    { n: run.eligible,  done: run.eligible > 0 },
+    { n: run.candidates,done: run.candidates > 0 && d.shards.length > 0 },
+    { n: tasksTotal,    done: tasksTotal > 0 && tasksDone === tasksTotal },
+    { n: run.screened,  done: run.status === "done" },
+    { n: run.closest,   done: run.status === "done" },
+  ];
+  // The live stage is the first one not yet finished.
+  const liveAt = stages.findIndex(s => !s.done);
+  stages.forEach((s, i) => {
+    const el = document.getElementById("s" + (i+1));
+    document.getElementById("n" + (i+1)).textContent = n(s.n);
+    el.className = "stg" + (s.done ? " done" : (i === liveAt ? " live" : ""));
+  });
 
   // Strata are painted once: the corpus does not change while a run is in flight.
   const core = document.getElementById("core");
@@ -447,6 +495,24 @@ def run_page(run_id: str):
         f"US {run.get('target')} &#183; {run.get('title','')} &#183; "
         f"priority {run.get('priority_date','')}",
         """
+<div class=well>
+  <h2>The run</h2>
+  <div class=string id=string>
+    <div class=stg id=s1><div class="stg-n num" id=n1>&mdash;</div>
+      <div class=stg-l>claim 1 split<br>by Gemini</div></div>
+    <div class=stg id=s2><div class="stg-n num" id=n2>&mdash;</div>
+      <div class=stg-l>eligible on<br>priority date</div></div>
+    <div class=stg id=s3><div class="stg-n num" id=n3>&mdash;</div>
+      <div class=stg-l>ranked by<br>embedding</div></div>
+    <div class=stg id=s4><div class="stg-n num" id=n4>&mdash;</div>
+      <div class=stg-l>Cloud Run<br>tasks</div></div>
+    <div class=stg id=s5><div class="stg-n num" id=n5>&mdash;</div>
+      <div class=stg-l>read against<br>every limitation</div></div>
+    <div class=stg id=s6><div class="stg-n num" id=n6>&mdash;</div>
+      <div class=stg-l>closest<br>art</div></div>
+  </div>
+</div>
+
 <div class=well>
   <div class=rig>
     <div>

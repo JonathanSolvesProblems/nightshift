@@ -5,13 +5,25 @@ the list for sitting down with a browser and a terminal.
 
 Cost is noted where a step spends money. Anything unmarked is free.
 
-**Setup, once per terminal session:**
+**Setup, once per terminal session.** Pick the one that matches your shell.
+
+Git Bash:
+
+```bash
+cd ~/OneDrive/Desktop/Projects/Time3/AllThingsAgentic
+export GOOGLE_APPLICATION_CREDENTIALS="$PWD/.secrets/priorart-dev.json"
+export PYTHONPATH="$PWD/src"
+```
+
+PowerShell:
 
 ```powershell
 cd C:\Users\Jon_A\OneDrive\Desktop\Projects\Time3\AllThingsAgentic
 $env:GOOGLE_APPLICATION_CREDENTIALS = "$PWD\.secrets\priorart-dev.json"
 $env:PYTHONPATH = "$PWD\src"
 ```
+
+Every command below uses forward slashes, which work in both.
 
 ---
 
@@ -54,9 +66,9 @@ row is green, something is wrong with the chart stage.
 
 ```powershell
 python -m pytest tests/ -q                          # 15 passed
-python scripts\test_failure_modes.py                # 12/12 passed
-python scripts\audit_ui.py 10163121-c398c4bc        # 17/17 passed
-python scripts\smoke_test.py                        # 171,703 G06Q patents
+python scripts/test_failure_modes.py                # 12/12 passed
+python scripts/audit_ui.py 10163121-c398c4bc        # 17/17 passed
+python scripts/smoke_test.py                        # 171,703 G06Q patents
 ```
 
 ## D. Prove the numbers are real
@@ -67,10 +79,10 @@ least is able to check.
 | # | Command | Cost | Expect |
 |---|---|---|---|
 | D1 | `python -m priorart.corpus stats --scope G06Q` | free | 171,695 patents, 1976 to 2021 |
-| D2 | `bq query --use_legacy_sql=false --project_id=prior-art-agent-2026 < scripts\gate_recall_compare.sql` | free | Old 64d vs new 768d: X @2k 54.0% then 83.9% |
+| D2 | `bq query --use_legacy_sql=false --project_id=prior-art-agent-2026 < scripts/gate_recall_compare.sql` | free | Old 64d vs new 768d: X @2k 54.0% then 83.9% |
 | D3 | `python -m priorart.eval --n 12 --cats X` | ~$0.20 | X near 97%, control far below |
 | D4 | `python -m priorart.eval --n 40 --cats X,Y` | ~$0.70 | Reproduces 97.5 / 92.5 / 18.8 exactly |
-| D5 | `python scripts\test_gemini.py` | free | A limitation mapped to a verbatim span |
+| D5 | `python scripts/test_gemini.py` | free | A limitation mapped to a verbatim span |
 
 D2 is free and is the strongest single check: it shows the embedding upgrade
 measured against the old one on the same pairs.
@@ -91,7 +103,7 @@ still going: tasks lighting up and the funnel counting down is the demo.
 ## F. The ADK agent
 
 ```powershell
-python scripts\test_agent.py 10163121-c398c4bc
+python scripts/test_agent.py 10163121-c398c4bc
 ```
 
 Four questions get asked. Watch the last one: asked whether the patent is
