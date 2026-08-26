@@ -80,23 +80,33 @@ lighting up. Right: the actual Cloud Run Jobs console and Vertex AI logs.*
 > Every quote is copied verbatim out of the reference so an attorney can go and
 > read it.
 
-## 3:10 – 3:40 · The receipt. Thirty seconds, no more.
+## 3:10 – 3:35 · The turn. This is the strongest thing in the film.
+
+*Cut to the second chart: US 6,564,189 at depth 1,129.*
+
+> That reference was at depth 218, and a USPTO examiner applied that exact
+> reference against that exact patent during prosecution. Nightshift found it
+> without ever seeing the file history. So the method works.
+>
+> But this one is the point. US 6,564,189, filed in 1998, eight years before the
+> patent's priority date. It appears nowhere in the examiner's citations. And it
+> teaches six of the seven limitations outright, where the examiner's own
+> reference teaches two.
+>
+> It sits at depth eleven twenty-nine. Nothing that hands a person a shortlist
+> was ever going to reach it.
+
+## 3:35 – 3:50 · The receipt. Fifteen seconds.
 
 *The /eval page.*
 
-> It sat at depth 218. And this is not my opinion of my own work: a USPTO
-> examiner applied that exact reference against that exact patent, as an
-> anticipation rejection, during prosecution. Nightshift found it without ever
-> seeing the file history.
+> Blinded, across forty cases, it re-finds the examiner's anticipation reference
+> ninety-seven and a half percent of the time, and stays quiet on eighty-one
+> percent of references the examiner never cited. That second number is what
+> makes the first one mean anything.
 >
-> That is not luck on one case. Ranked by the best embedding available, a top
-> fifty shortlist still misses fifty-nine percent of the references examiners
-> actually applied. Reading two thousand finds eighty-four percent of them.
->
-> And blinded, across forty of those cases, it re-found the examiner's
-> anticipation reference ninety-seven and a half percent of the time, while
-> staying quiet on eighty-one percent of references the examiner never cited.
-> That second number is what makes the first one mean anything.
+> And those figures are a floor, not an estimate, because they score a reference
+> the examiner missed as a miss. Like the one you just saw.
 
 ## 3:40 – 4:00 · Close.
 

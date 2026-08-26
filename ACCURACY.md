@@ -132,6 +132,42 @@ This target also demonstrates the eligibility gate on its own. It was **filed in
 would have searched eleven years of art that is not prior art at all, and the
 gate correctly drops 126,787 of 171,694 candidates.
 
+### The result that matters more than re-finding the examiner's reference
+
+Re-finding what an examiner already found proves the method works. It is not the
+product. The product is finding what the examiner missed, and this run did.
+
+| Reference | Depth | Taught outright | In substance | Not taught |
+|---|---|---|---|---|
+| US 7,606,730, **the reference the examiner applied** | 218 | 2 | 5 | 0 |
+| US 7,066,387 | 1,447 | 5 | 2 | 0 |
+| **US 6,564,189** | **1,129** | **6** | **0** | 1 |
+
+US 6,564,189, "Universal methods and apparatus for determining prices and rewards
+within retail transactions", was filed 1998-12-22, nearly **eight years** before
+this patent's priority date. It is unambiguously eligible prior art, it appears
+**nowhere** in the examiner's citations for this application, and it teaches six
+of the seven limitations outright where the examiner's own reference teaches two.
+
+Reproduce: [`/chart/10163121-c398c4bc?ref=6564189`](https://nightshift-1015687974010.us-central1.run.app/chart/10163121-c398c4bc?ref=6564189).
+
+Two things follow.
+
+The first is the honest reading of every recall figure in this document. They are
+measured against the examiner, and an examiner's own search runs 45 to 85%
+recall, so a reference Nightshift finds that the examiner missed is scored here
+as a **miss**. This is one of those misses. The numbers above understate the tool
+by exactly the amount an examiner's search understates the art.
+
+The second is why depth is not a decoration. Depth 1,129 is not reachable by
+anything that shows a person a shortlist. It is reachable by reading.
+
+A caution stated plainly: "teaches more of the claim" is a factual statement
+about disclosure, not a legal one about strength. Which reference makes the
+better invalidity case depends on claim construction, on combination under §103,
+and on argument, and those are questions for counsel. What is measured here is
+how much of the claim each reference discloses.
+
 ### How this case was chosen
 
 Selected by `scripts/pick_demo_target.py`, which scores candidates rather than

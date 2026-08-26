@@ -106,6 +106,8 @@ The USPTO publishes which references an examiner applied in a rejection, and aga
 Blinded, with the reference's number, title, assignee and dates stripped from the prompt: on references an examiner applied to anticipate, it finds them 97.5% of the time (n=40). On references applied for obviousness, 92.5% (n=40). On references the examiner never cited, drawn from the same corpus and passing the same date gate, it stays quiet 81.2% of the time (n=80). That control is what makes the first two numbers mean anything.
 
 And the number that explains why the architecture looks like this. Ranking the corpus with gemini-embedding-001, the strongest embedding available, a top-50 shortlist still misses 59.7% of the references examiners actually applied. Every commercial patent tool ranks a corpus and shows a person the top few dozen results, and no amount of ranking quality rescues that design. Reading 2,000 finds 83.9%.
+
+But the result I am most pleased with is one the scoring counts against me. On the demo patent, the examiner applied US 7,606,730, which teaches two of the seven limitations outright. At depth 1,129 Nightshift found US 6,564,189, filed eight years before the priority date, absent from the examiner's citations entirely, teaching six of seven outright. Because accuracy here is measured against the examiner, that reference is scored as a MISS. The published numbers understate the tool by exactly the amount an examiner's own search understates the art, and I would rather report it that way than move the goalposts.
 ```
 
 ### What I learned

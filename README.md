@@ -151,6 +151,31 @@ The case was chosen by `scripts/pick_demo_target.py`, which scores candidates on
 depth and on how much of the claim the chart actually carries, rather than by
 picking one that looked good. Scores are in `eval/demo-candidates.json`.
 
+### And the result that matters more
+
+Re-finding what an examiner already found proves the method works. Finding what
+the examiner **missed** is the product, and this run did.
+
+| Reference | Depth | Taught outright | In substance | Not taught |
+|---|---|---|---|---|
+| US 7,606,730, the reference the examiner applied | 218 | 2 | 5 | 0 |
+| **US 6,564,189** | **1,129** | **6** | **0** | 1 |
+
+[US 6,564,189](https://nightshift-1015687974010.us-central1.run.app/chart/10163121-c398c4bc?ref=6564189),
+"Universal methods and apparatus for determining prices and rewards within retail
+transactions", was filed **1998-12-22**, nearly eight years before this patent's
+priority date. It is unambiguously eligible prior art, it appears **nowhere** in
+the examiner's citations, and it teaches six of seven limitations outright where
+the examiner's own reference teaches two.
+
+That is also the honest reading of every recall number above. They are measured
+against the examiner, so a reference Nightshift finds that the examiner missed
+counts here as a **miss**. This is one of those misses.
+
+"Teaches more of the claim" is a statement about disclosure, not about legal
+strength. Which reference makes the better invalidity case depends on claim
+construction and argument, and those are questions for counsel.
+
 ## Scope, stated up front
 
 The eval denominator is disclosed rather than implied, because a recall figure
