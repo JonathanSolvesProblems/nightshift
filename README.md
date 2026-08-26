@@ -166,27 +166,120 @@ demand letter
 
 ## Spin-up
 
-Requires a Google Cloud project with BigQuery enabled and a Gemini API key.
+Needs a Google Cloud project with billing attached. Gemini runs on **Vertex AI**,
+not the AI Studio endpoint, so no API key is required: the service account
+authenticates. (The AI Studio free tier caps some models at 20 requests a day,
+which is unusable when the unit of work is thousands of candidates.)
+
+### 1. Project and permissions
+
+```bash
+gcloud services enable bigquery.googleapis.com aiplatform.googleapis.com \
+  run.googleapis.com firestore.googleapis.com cloudbuild.googleapis.com \
+  --project=YOUR_PROJECT
+
+gcloud iam service-accounts create priorart --project=YOUR_PROJECT
+
+for ROLE in bigquery.user bigquery.dataEditor aiplatform.user \
+            datastore.user run.developer iam.serviceAccountUser; do
+  gcloud projects add-iam-policy-binding YOUR_PROJECT \
+    --member="serviceAccount:priorart@YOUR_PROJECT.iam.gserviceaccount.com" \
+    --role="roles/$ROLE" --condition=None
+done
+
+gcloud iam service-accounts keys create key.json \
+  --iam-account=priorart@YOUR_PROJECT.iam.gserviceaccount.com
+
+# Firestore needs a NAMED database. The default database id "(default)" is
+# percent-encoded into the resource path inside a container and every call fails
+# with "400 Invalid database id %28default%29".
+gcloud firestore databases create --database=nightshift --location=nam5 \
+  --project=YOUR_PROJECT
+```
+
+### 2. Local setup
 
 ```bash
 git clone https://github.com/JonathanSolvesProblems/nightshift.git
 cd nightshift
 python -m pip install -r requirements.txt
 
-export PRIOR_ART_PROJECT=your-project-id
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-export GEMINI_API_KEY=your-key
-
-# Materialize the corpus. One-time, ~46 GB scanned, prints cost before running.
-python -m priorart.corpus bootstrap --scope G06Q --execute
-
-# Verify
-python scripts/smoke_test.py
-python -m priorart.corpus stats --scope G06Q
+export PRIOR_ART_PROJECT=YOUR_PROJECT
+export GOOGLE_APPLICATION_CREDENTIALS=$PWD/key.json
+export PYTHONPATH=$PWD/src
 ```
 
-Every BigQuery call is dry-run priced before execution and refuses to run above a
-configurable scan ceiling. The whole corpus build fits inside the free tier.
+### 3. Build the corpus
+
+One-time. Every query is dry-run priced first and refuses to run above a
+configurable scan ceiling, so nothing here can surprise you with a bill.
+
+```bash
+# ~46 GB scanned. Prints the cost and waits.
+python -m priorart.corpus bootstrap --scope G06Q --execute
+
+# Filing and priority dates, needed for the prior-art eligibility gate.
+bq query --use_legacy_sql=false --project_id=$PRIOR_ART_PROJECT \
+  --destination_table=$PRIOR_ART_PROJECT:corpus.dates_g06q --replace \
+  --clustering_fields=patent_id < scripts/build_dates.sql
+
+# The evaluation gold set: references examiners applied in real rejections.
+bq query --use_legacy_sql=false --project_id=$PRIOR_ART_PROJECT \
+  --destination_table=$PRIOR_ART_PROJECT:corpus.gold_pairs --replace \
+  < scripts/gold_pairs.sql
+```
+
+### 4. Verify
+
+```bash
+python scripts/smoke_test.py                      # BigQuery reachable
+python -m priorart.corpus stats --scope G06Q      # 171,695 patents
+python scripts/test_gemini.py                     # Vertex reachable
+python scripts/test_failure_modes.py              # 12 checks
+```
+
+### 5. Run it
+
+```bash
+# Local, single process.
+python -m priorart.run 10140422 --candidates 200
+
+# Distributed, after deploying (below).
+python -m priorart.orchestrate 10140422 --candidates 2000 --tasks 10
+```
+
+### 6. Deploy
+
+```bash
+gcloud builds submit --tag gcr.io/$PRIOR_ART_PROJECT/nightshift:v1
+
+gcloud run jobs create nightshift-worker \
+  --image=gcr.io/$PRIOR_ART_PROJECT/nightshift:v1 --region=us-central1 \
+  --service-account=priorart@$PRIOR_ART_PROJECT.iam.gserviceaccount.com \
+  --command=python --args="-m,priorart.worker" \
+  --tasks=1 --max-retries=1 --task-timeout=3600s --memory=1Gi \
+  --set-env-vars="PRIOR_ART_PROJECT=$PRIOR_ART_PROJECT"
+
+gcloud run deploy nightshift \
+  --image=gcr.io/$PRIOR_ART_PROJECT/nightshift:v1 --region=us-central1 \
+  --service-account=priorart@$PRIOR_ART_PROJECT.iam.gserviceaccount.com \
+  --allow-unauthenticated --port=8080 --memory=1Gi \
+  --set-env-vars="PRIOR_ART_PROJECT=$PRIOR_ART_PROJECT,PRIOR_ART_TASKS=10,PRIOR_ART_CANDIDATES=2000"
+```
+
+### Reproduce the published numbers
+
+```bash
+python -m priorart.eval --n 40 --cats X,Y        # 97.5% / 92.5% / 18.8%
+bq query --use_legacy_sql=false < scripts/gate_recall.sql
+python scripts/pick_demo_target.py --pairs 16    # how the demo case was chosen
+```
+
+### The ADK agent
+
+```bash
+python scripts/test_agent.py <run_id>
+```
 
 ## Data sources and licensing
 
