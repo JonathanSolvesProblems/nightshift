@@ -5,6 +5,32 @@ Status as of 2026-08-26. Deadline 2026-08-31 17:00 PDT.
 `[x]` verified by running it. `[ ]` not yet run. Anything not run is not passing,
 regardless of how likely it is to pass.
 
+## Current totals
+
+| Suite | Command | Result |
+|---|---|---|
+| Unit regression | `python -m pytest tests/ -q` | **15/15** |
+| Failure modes | `python scripts/test_failure_modes.py` | **12/12** |
+| Interface invariants | `python scripts/audit_ui.py <run_id>` | **17/17** |
+| Live routes | all four | 200, 213-526 ms |
+
+**44 of 44 automated checks pass.** What each round found, before it passed:
+
+- Failure modes: `/run` returned HTTP 500 on non-numeric input, and the
+  orchestrator accepted a target with no claim text, standing ready to bill ten
+  Cloud Run tasks for a run that could not produce a finding.
+- Interface: tertiary ink at 2.74:1 against the light well, under the 3:1 floor,
+  and horizontal overflow at 390px on two pages.
+- Clean clone: the README told the reader to export `GEMINI_API_KEY`, which the
+  pipeline stopped reading when it moved to Vertex AI.
+- Infrastructure: two corpus tables were due to self-delete on 2026-10-17,
+  inside the judging window, because the dataset carried a 60-day default
+  expiration that every new table inherited.
+
+Still open: the demo video, and the Gemini re-embedding, which is upside rather
+than a dependency since the shipped 64-dimensional prefilter is what produced
+every published number.
+
 ---
 
 ## A. Functional correctness
