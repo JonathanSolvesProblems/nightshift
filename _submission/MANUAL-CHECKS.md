@@ -43,6 +43,12 @@ Use a **private/incognito window**. The point is to see what a judge sees.
 | A8 | [Accuracy](https://nightshift-1015687974010.us-central1.run.app/eval) | X 97.5%, Y 92.5%, control 18.8% | Any cell blank |
 | A9 | Switch OS to light mode, reload | Pale mineral stock, deep olive accent, all readable | Anything washed out |
 | A10 | Narrow the window to phone width | Rail stacks to two columns, nothing scrolls sideways | A horizontal scrollbar |
+| A11 | [A run that has not started](https://nightshift-1015687974010.us-central1.run.app/run/10163121-3ae65353) | Every count filled in | A dash where a count should be |
+
+A11 is about the opposite case, and it is easier to check on a run you start
+yourself (section F). Before a task has read anything, "read by Gemini" and
+"closest art" must show a dash, not a zero. A zero there is a finding of none,
+which is a different and untrue claim.
 
 Read the tagline on A1 aloud, then check it against A4. It says Nightshift
 **ranks** 171,695 and **reads** 2,000, and the run page says "read by Gemini
@@ -102,20 +108,33 @@ E1 is free and is the strongest single check.
 The cut face only animates while candidates are being screened. A finished run
 shows empty lanes, so the only way to see it is to watch one.
 
+**Start it from the site, not the terminal**, because the browser path is the one
+a judge sees. Enter 10163121 on the home page, or upload the letter from section
+B and click "Search this one".
+
+What should happen, in order:
+
+1. The **sinking page** appears immediately and writes itself line by line over
+   about 25 seconds: reading the patent, splitting claim 1 (7 limitations),
+   ranking (2,183 MB scanned), the eligibility count (44,907 of 171,694),
+   the strata, launching 10 tasks. The last line has a blinking kerf on it.
+2. It redirects itself to the core log.
+3. The rail sits on stage 4 while Cloud Run places the tasks, and the status
+   line under "Cloud Run tasks" reports what Cloud Run itself says, with a
+   running clock. **This can take three minutes.** Placement time is Google's,
+   not the code's, and the page says which state it is in rather than promising
+   a number.
+4. Stage 5 goes live and the ten lanes start flowing.
+
+If you would rather not click, the terminal form is the same work:
+
 ```bash
 python -m priorart.orchestrate 10163121 --candidates 2000 --tasks 10
 ```
 
-~$9, about four minutes. It prints a run id. **Open the run page immediately**:
-
-`https://nightshift-1015687974010.us-central1.run.app/run/<run_id>`
-
-Watch for: the rail lighting stage by stage, ten lanes of particles crossing the
-cut face, the funnel counting down, seams appearing in the depth column at their
-measured depth.
-
-There is a cheaper version at `--candidates 500 --tasks 10` for about $2 if you
-only want to see the motion.
+Either way it is ~$9 and about four minutes of reading after placement. There is
+a cheaper version at `--candidates 500 --tasks 10` for about $2 if you only want
+to see the motion.
 
 **Do not run this more than you need to.** It is the main cost in the project.
 

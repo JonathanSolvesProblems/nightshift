@@ -32,10 +32,16 @@ from __future__ import annotations
 
 import json
 import os
-import threading
+import time
+
+from google.cloud import run_v2
 
 from fastapi import FastAPI, File, Form, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    StreamingResponse,
+)
 
 from . import judge, orchestrate, store
 
@@ -168,6 +174,26 @@ h2{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink3)
 .tk.run{background:var(--ink3)}
 .tk.done{background:var(--seam);border-color:var(--seam)}
 
+/* the sinking page: streamed, one line per stage as it lands.
+   The live marker is :last-child rather than script, because the browser
+   re-evaluates it every time another line arrives over the wire. */
+.steps{list-style:none;margin:var(--s3) 0 0;padding:0;font-size:13.5px;line-height:2.15}
+.steps li{color:var(--ink2);padding-left:22px;position:relative;
+  animation:land var(--settle) var(--ease) both}
+.steps li::before{content:"";position:absolute;left:0;top:.95em;
+  width:11px;height:1px;background:var(--ink3)}
+.steps li.fact{color:var(--ink)}
+.steps li.fact::before{background:var(--seam);height:3px;top:.85em}
+.steps li:last-child::after{content:"";display:inline-block;width:6px;height:11px;
+  margin-left:8px;background:var(--seam);vertical-align:-1px;
+  animation:kerf 1.05s steps(2,end) infinite}
+@keyframes kerf{0%{opacity:1}50%{opacity:0}100%{opacity:1}}
+@keyframes land{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){
+  .steps li{animation:none}
+  .steps li:last-child::after{animation:none}
+}
+
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 th{text-align:left;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
   color:var(--ink3);font-weight:600;padding:var(--s1) var(--s2) var(--s1) 0;
@@ -284,10 +310,16 @@ async function tick(){
   const d = await res.json(), run = d.run;
   const total = run.candidates || 1;
 
+  // A number is shown once the stage that produces it has produced something.
+  // Before that it is a dash, not a zero: on a run that has not started reading,
+  // "closest art 0" is a finding of none, which is a different and untrue claim.
+  const reading = (run.screened || 0) > 0, over = run.status === "done";
+  const yet = v => (reading || over) ? v : null;
+
   set("corpus", run.corpus_size); set("dropped", run.dropped_not_prior_art);
   set("family", run.dropped_same_family); set("eligible", run.eligible);
-  set("screened", run.screened); set("closest", run.closest);
-  set("hot", run.strong); set("partial", run.partial);
+  set("screened", yet(run.screened)); set("closest", yet(run.closest));
+  set("hot", yet(run.strong)); set("partial", yet(run.partial));
 
   // The drill string. A stage is "done" when its work finished and "live" when
   // it is the one currently cutting. Both are derived from run state, never from
@@ -295,13 +327,18 @@ async function tick(){
   const nLim = (run.limitations||[]).length;
   const tasksDone = d.shards.filter(s => s.status === "done").length;
   const tasksTotal = d.shards.length || run.tasks || 0;
+  //
+  // Stage 4 is "the tasks are up", not "the tasks are finished", so that stage 5
+  // is the live one while Gemini is actually reading. How many have finished is
+  // the panel below; putting it here too made the rail stall on stage 4 for the
+  // whole run, which is the part a person is watching.
   const stages = [
     { n: nLim,          done: nLim > 0 },
     { n: run.eligible,  done: run.eligible > 0 },
-    { n: run.candidates,done: run.candidates > 0 && d.shards.length > 0 },
-    { n: tasksTotal,    done: tasksTotal > 0 && tasksDone === tasksTotal },
-    { n: run.screened,  done: run.status === "done" },
-    { n: run.closest,   done: run.status === "done" },
+    { n: run.candidates,done: run.candidates > 0 },
+    { n: tasksTotal || null, done: tasksTotal > 0 && d.shards.length >= tasksTotal },
+    { n: yet(run.screened), done: over },
+    { n: yet(run.closest),  done: over },
   ];
   // The live stage is the first one not yet finished.
   const liveAt = stages.findIndex(s => !s.done);
@@ -362,22 +399,50 @@ async function tick(){
     ? drawn.length + " strongest of " + strong.length + " marked, thickness by limitations matched"
     : (strong.length ? strong.length + " marked, thickness by limitations matched" : "");
 
-  feed(d.shards, run.findings || 0);
+  feed(d.shards, run.findings || 0, tasksTotal);
   const note = document.getElementById("flownote");
   if(note) note.textContent = reduce
     ? "motion disabled by your system settings"
-    : (run.status === "done"
-        ? "run complete, " + n(run.screened) + " candidates read across " +
-          (d.shards.length || 0) + " tasks"
-        : "one mark per four candidates read, one bright mark per finding");
+    : over
+      ? "run complete, " + n(run.screened) + " candidates read across " +
+        (d.shards.length || 0) + " tasks"
+      : reading
+        ? "one mark per four candidates read, one bright mark per finding"
+        : tasksTotal
+          ? tasksTotal + " lanes open, one per Cloud Run task. Nothing moves until a " +
+            "task reports, so an empty face means the tasks are still starting"
+          : "no task has reported yet";
 
   const done = d.shards.filter(s => s.status === "done").length;
-  document.getElementById("tasks").innerHTML = d.shards.map(s =>
-    `<div class="tk ${s.status==="done"?"done":"run"}" title="task ${s.index}: ${s.screened}/${s.assigned}"></div>`
-  ).join("");
-  document.getElementById("status").textContent =
-    run.status === "queued" ? "waiting for Cloud Run to provision tasks"
-    : done + " of " + (d.shards.length || run.tasks || 0) + " Cloud Run tasks finished";
+  // Task marks are drawn from the moment the count is known, so ten empty marks
+  // stand there waiting rather than nothing at all.
+  const marks = d.shards.length ? d.shards.map(s =>
+      `<div class="tk ${s.status==="done"?"done":"run"}" title="task ${s.index}: ${s.screened}/${s.assigned}"></div>`)
+    : Array.from({length: tasksTotal}, (_, i) =>
+      `<div class="tk" title="task ${i}: not reporting yet"></div>`);
+  document.getElementById("tasks").innerHTML = marks.join("");
+
+  // Elapsed matters more than any of it while nothing is happening: it is the
+  // difference between a page that is waiting and a page that is broken.
+  let el = "";
+  if(run.launched_at && !over){
+    const s = Math.max(0, Math.round(Date.now()/1000 - run.launched_at));
+    el = " \\u00b7 " + (s < 90 ? s + "s" : Math.floor(s/60) + "m " + (s%60) + "s elapsed");
+  }
+  document.getElementById("status").textContent = (
+    over ? done + " of " + (d.shards.length || tasksTotal) + " Cloud Run tasks finished"
+    : d.shards.length === 0
+      // What Cloud Run itself says, when it says anything. No promise about how
+      // long: a job can sit queued for regional capacity, and a page that says
+      // "within a minute" while the clock passes two is worse than one that says
+      // plainly what state the execution is in.
+      ? (run.exec_state || (tasksTotal
+          ? "Cloud Run is starting " + tasksTotal + " tasks. Nothing reports until "
+            + "a task is placed"
+          : "waiting for Cloud Run to start the tasks"))
+    : done === 0
+      ? d.shards.length + " of " + tasksTotal + " tasks reading, none finished yet"
+    : done + " of " + tasksTotal + " Cloud Run tasks finished") + el;
 
   document.getElementById("rows").innerHTML = (d.findings||[]).map(f =>
     `<tr><td class="n num">${n(f.rank)}</td>`+
@@ -421,12 +486,16 @@ function fit(){
   cv.width = r.width * d; cv.height = r.height * d;
   cx.setTransform(d,0,0,d,0,0);
 }
-addEventListener("resize", fit);
+addEventListener("resize", () => { fit(); if(!running) rest(); });
 
 /* Emission is derived from real progress, never invented. */
-function feed(shards, findings){
+function feed(shards, findings, expected){
   if(!cv || reduce) return;
-  lanes = Math.max(1, shards.length);
+  const was = lanes;
+  lanes = Math.max(1, shards.length || expected || 1);
+  // Draw the lanes as soon as the task count is known. An empty ruled face says
+  // ten tasks are about to cut here; an empty box says the page is broken.
+  if(!running && (lanes !== was || !parts.length)) rest();
   shards.forEach(s => {
     const before = prevScreened[s.index] || 0;
     const delta  = Math.max(0, (s.screened || 0) - before);
@@ -447,6 +516,19 @@ function feed(shards, findings){
                  j: (Math.random() - 0.5) * 5, hit: true });
   }
   if(parts.length && !running){ running = true; requestAnimationFrame(draw); }
+}
+
+/* The lane rules on their own: the ground each task is cutting, with nothing
+   moving through it yet. */
+function rest(){
+  if(!cv) return;
+  const w = cv.clientWidth, h = cv.clientHeight, pad = 16;
+  cx.clearRect(0,0,w,h);
+  cx.strokeStyle = CSSVAR("--hairline") || "#3A413E"; cx.lineWidth = 1;
+  for(let i = 0; i <= lanes; i++){
+    const y = Math.round(pad + i*((h-pad*2)/lanes)) + .5;
+    cx.beginPath(); cx.moveTo(pad, y); cx.lineTo(w-pad, y); cx.stroke();
+  }
 }
 
 function draw(){
@@ -484,12 +566,7 @@ function draw(){
   parts = parts.filter(p => p.x <= w - pad*2);
 
   if(alive){ requestAnimationFrame(draw); }
-  else { running = false; cx.clearRect(0,0,w,h);
-         cx.strokeStyle = hair; cx.lineWidth = 1;
-         for(let i = 0; i <= lanes; i++){
-           const y = Math.round(pad + i*((h-pad*2)/lanes)) + .5;
-           cx.beginPath(); cx.moveTo(pad, y); cx.lineTo(w-pad, y); cx.stroke();
-         } }
+  else { running = false; rest(); }
 }
 
 fit();
@@ -497,17 +574,29 @@ tick(); setInterval(tick, 2000);
 """
 
 
-def shell(title: str, sub: str, body: str, script: str = "") -> HTMLResponse:
-    return HTMLResponse(
+def head(title: str, sub: str) -> str:
+    """Everything down to the open body tag.
+
+    Split out of `shell` so a slow page can be written to the browser in pieces
+    rather than held back until the work behind it finishes.
+    """
+    return (
         "<!doctype html><html lang=en><head><meta charset=utf-8>"
         '<meta name=viewport content="width=device-width,initial-scale=1">'
         f"<title>{title}</title>"
         f'<link rel=preconnect href="https://fonts.gstatic.com" crossorigin>'
         f'<link rel=stylesheet href="{FONTS}">'
         f"<style>{CSS}</style></head><body>"
-        '<header><div class=mark><b>NIGHTSHIFT</b> <span>&#183; prior-art core log</span></div>'
+        '<header><div class=mark><b>NIGHTSHIFT</b> '
+        "<span>&#183; prior-art core log</span></div>"
         f"<div class=sub>{sub}</div></header>"
-        f"{body}"
+    )
+
+
+def shell(title: str, sub: str, body: str, script: str = "") -> HTMLResponse:
+    return HTMLResponse(
+        head(title, sub)
+        + body
         + (f"<script>{script}</script>" if script else "")
         + "</body></html>"
     )
@@ -645,29 +734,123 @@ def start(patent: str = Form(...)):
             "Enter the number from the demand letter, digits only. "
             "For example 10140422.",
         )
-    try:
-        run_id = orchestrate.prepare(pid, DEFAULT_CANDIDATES)
-    except (LookupError, ValueError) as exc:
-        return _refused(f"Cannot search against US {_esc(pid)}.", _esc(str(exc)))
+    return StreamingResponse(
+        _sink(pid),
+        media_type="text/html; charset=utf-8",
+        # Nothing between here and the browser may hold the body back: the whole
+        # point is that each line arrives when it happens.
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
-    threading.Thread(
-        target=orchestrate.launch, args=(run_id, DEFAULT_TASKS), daemon=True
-    ).start()
-    return RedirectResponse(f"/run/{run_id}", status_code=303)
+
+def _sink(pid: str):
+    """Write the preparation of a run out to the browser as it happens.
+
+    Preparing a run is about a minute of BigQuery and Gemini before the core log
+    exists to redirect to: the claim split, the retrieval scan, the funnel counts
+    and the depth strata. Holding the response for that minute is indistinguishable
+    from a hung page, and the first thing anyone does with a hung page is press the
+    button again, which bills a second run.
+
+    So the response opens immediately and each stage is appended as it lands. The
+    numbers on screen are the real ones coming back from the work, which means the
+    wait is also the first thing that shows the machine is doing something.
+    """
+    yield head(f"Sinking US {_esc(pid)}",
+               "Preparing the run. Nothing is billed to a task yet.")
+    yield ("<div class=well><h2>Sinking a borehole against "
+           f"US&nbsp;{_esc(pid)}</h2><ol class=steps>")
+    run_id = ""
+    try:
+        for kind, text in orchestrate.prepare_iter(pid, DEFAULT_CANDIDATES):
+            if kind == "done":
+                run_id = text
+                break
+            yield f"<li class={'fact' if kind == 'fact' else 'step'}>{_esc(text)}</li>"
+        else:
+            raise RuntimeError("preparation finished without producing a run")
+    except (LookupError, ValueError, RuntimeError) as exc:
+        yield ("</ol></div>"
+               + _refusal(f"Cannot search against US {_esc(pid)}.", _esc(str(exc)))
+               + "</body></html>")
+        return
+
+    # Launched in the request rather than a background thread. Cloud Run throttles
+    # CPU once a response is finished, so a thread outliving its request is a race;
+    # the job launch is one API call and shows here as a stage like any other.
+    yield f"<li class=step>launching {DEFAULT_TASKS} Cloud Run tasks</li>"
+    try:
+        orchestrate.launch(run_id, DEFAULT_TASKS)
+    except Exception as exc:  # noqa: BLE001
+        yield ("</ol></div>"
+               + _refusal("The run was prepared but the tasks did not launch.",
+                          _esc(str(exc)[:200]))
+               + "</body></html>")
+        return
+
+    yield (f"<li class=fact>run {_esc(run_id)}</li></ol>"
+           f'<div class=note style="margin-top:16px">'
+           f'<a href="/run/{run_id}">Open the core log</a></div></div>'
+           f'<script>location.replace("/run/{run_id}")</script></body></html>')
+
+
+def _refusal(headline: str, detail: str) -> str:
+    return f"""
+<div class=well>
+  <div style="font-size:17px;margin-bottom:10px">{headline}</div>
+  <div class=note>{detail}</div>
+  <div class=note style="margin-top:16px"><a href="/">Try another number</a></div>
+</div>
+"""
 
 
 def _refused(headline: str, detail: str) -> HTMLResponse:
     return shell(
         "Nightshift",
         "Prior-art evidence for a patent demand letter",
-        f"""
-<div class=well>
-  <div style="font-size:17px;margin-bottom:10px">{headline}</div>
-  <div class=note>{detail}</div>
-  <div class=note style="margin-top:16px"><a href="/">Try another number</a></div>
-</div>
-""",
+        _refusal(headline, detail),
     )
+
+
+_EXEC_CACHE: dict[str, tuple[float, str]] = {}
+
+
+def _execution_state(name: str) -> str:
+    """One sentence on what Cloud Run says about an execution that is not reporting.
+
+    Until a task writes its first shard there is nothing in Firestore to show, and
+    a job queued behind regional capacity looks exactly like a job that failed to
+    launch: ten empty task marks and a page that appears stuck. Cloud Run knows
+    which it is, so it is worth one call to ask, cached because the page polls
+    every two seconds and this does not change that fast.
+    """
+    now = time.time()
+    hit = _EXEC_CACHE.get(name)
+    if hit and now - hit[0] < 10:
+        return hit[1]
+
+    phrase = ""
+    try:
+        ex = run_v2.ExecutionsClient().get_execution(name=name)
+        total = ex.task_count or 0
+        if ex.running_count:
+            phrase = (f"{ex.running_count} of {total} tasks running on Cloud Run, "
+                      "none has reported in yet")
+        else:
+            waiting = any(c.type_ == "Retry" for c in ex.conditions)
+            phrase = (
+                f"Cloud Run has the execution queued and is waiting for capacity "
+                f"to place {total} tasks"
+                if waiting else
+                next((c.message for c in ex.conditions
+                      if c.type_ == "Started" and c.state != c.State.CONDITION_SUCCEEDED),
+                     "")
+            )
+    except Exception:  # noqa: BLE001
+        phrase = ""
+
+    _EXEC_CACHE[name] = (now, phrase)
+    return phrase
 
 
 @app.get("/api/run/{run_id}")
@@ -676,6 +859,8 @@ def api_run(run_id: str):
     if not run:
         return JSONResponse({"error": "not found"}, status_code=404)
     shards = store.list_shards(run_id)
+    if not shards and run.get("execution") and run.get("status") != "done":
+        run["exec_state"] = _execution_state(run["execution"])
     all_findings = store.list_findings(run_id)
     run["screened"] = sum(s.get("screened", 0) for s in shards)
     run["findings"] = len(all_findings)
@@ -763,7 +948,7 @@ def run_page(run_id: str):
       <div class=lip>
         <h2>Cloud Run tasks</h2>
         <div class=tasks id=tasks></div>
-        <div class=note id=status>starting</div>
+        <div class=note id=status>reading the run</div>
         <div class=note><a id=chartlink href="/chart/__RID__" style="display:none">
         Draw the claim chart for the deepest strong reference</a></div>
       </div>

@@ -27,8 +27,13 @@ produced, fix that before recording anything.
 
 ## 0:22 – 0:40 · One action, then walk away.
 
-*Patent number entered. "Sink a borehole" clicked. Claim 1 splits into seven
-limitations. Cut to the core log page.*
+*Patent number entered. "Sink a borehole" clicked. The sinking page writes itself
+line by line, real time, no speed ramp: claim 1 splits into seven limitations,
+44,907 of 171,694 are eligible, ten tasks launch. Cut to the core log page.*
+
+*This is about 25 seconds of screen and it is worth spending, because it is the
+only place the pipeline states each stage in words. Do not cut it to a title
+card.*
 
 > This is US 10,163,121. Claim 1 breaks into seven limitations, and every US
 > patent in this class that predates its priority date is now eligible prior art.
@@ -125,7 +130,7 @@ lighting up. Right: the actual Cloud Run Jobs console and Vertex AI logs.*
 | # | Shot | Source |
 |---|---|---|
 | 1 | Demand letter on a desk | staged prop, clearly a prop |
-| 2 | Patent number entry, claim split | live service |
+| 2 | Patent number entry, then the sinking page writing itself | live service |
 | 3 | Core log, funnel + seams + tasks | live service, real run |
 | 4 | Cloud Run Jobs console, tasks executing | GCP console |
 | 5 | Vertex AI request logs | GCP console |
@@ -154,6 +159,17 @@ What IS stable, and safe to narrate:
   as an anticipation rejection
 - that some limitations are taught, some in substance, and some not at all
 - the blinded accuracy figures, which come from a fixed-seed run and do not move
+
+## Cloud Run task placement is not instant, and the recording has to allow for it
+
+Between "launching 10 Cloud Run tasks" and the first lane moving, Cloud Run
+places the tasks. That took under a minute on one run and about three on the
+next, and none of it is under the code's control. The run page reports the
+execution's own state while it waits, so the wait is legible rather than blank,
+but it is dead air on camera.
+
+Record the launch and the reading as two takes and cut between them. Do not speed
+ramp the wait, and do not narrate a placement time.
 
 ## Rules for the edit
 

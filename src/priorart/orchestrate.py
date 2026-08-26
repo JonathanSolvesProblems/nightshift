@@ -47,8 +47,18 @@ QUALIFY rank < @topn
 """
 
 
-def prepare(target_id: str, n_candidates: int, scope: str = "G06Q") -> str:
-    """Build the run's candidate table and Firestore record. Returns run_id."""
+def prepare_iter(target_id: str, n_candidates: int, scope: str = "G06Q"):
+    """Build the run's candidate table and Firestore record, reporting as it goes.
+
+    A generator because this takes the better part of a minute before there is
+    anything to look at: the claim split, a 1.3 GB retrieval scan, the funnel
+    counts and the depth strata all happen before the run page exists. A caller
+    that has a person waiting can show each stage as it lands instead of holding
+    a blank screen until the whole thing finishes.
+
+    Yields ("step", text) when work starts, ("fact", text) for a result worth
+    putting in front of someone, and finally ("done", run_id).
+    """
     run_id = f"{target_id}-{uuid.uuid4().hex[:8]}"
     suffix = scope.lower()
 
@@ -57,6 +67,7 @@ def prepare(target_id: str, n_candidates: int, scope: str = "G06Q") -> str:
             f"'{target_id}' is not a patent number. Digits only, for example 10140422."
         )
 
+    yield "step", f"reading US {target_id} out of the CPC {scope} corpus"
     target = corpus.get_target(target_id, scope)
 
     # Refuse before spending anything.
@@ -73,14 +84,19 @@ def prepare(target_id: str, n_candidates: int, scope: str = "G06Q") -> str:
             "ends in 2019, so grants from 2020 onward cannot be analysed here."
         )
 
+    yield "fact", target.title
+
+    yield "step", "splitting claim 1 into limitations with Gemini"
     gc = judge.client()
     limitations = judge.split_claim(target.claim_1, gc)
     if not limitations:
         raise ValueError(
             f"Claim 1 of US {target_id} could not be split into limitations."
         )
-    print(f"claim 1 -> {len(limitations)} limitations", file=sys.stderr)
+    yield "fact", f"claim 1 splits into {len(limitations)} limitations"
 
+    yield "step", (f"ranking every eligible patent by embedding distance and "
+                   f"materializing the closest {n_candidates:,}")
     client = bigquery.Client(project=config.PROJECT_ID, location=config.LOCATION)
     tables = dict(
         vectors=config.vector_table(suffix),
@@ -104,15 +120,19 @@ def prepare(target_id: str, n_candidates: int, scope: str = "G06Q") -> str:
         ),
     )
     job.result()
-    print(f"candidates -> {dest} ({job.total_bytes_billed / 1024**2:.0f} MB)",
-          file=sys.stderr)
+    yield "fact", f"{job.total_bytes_billed / 1024**2:.0f} MB scanned in BigQuery"
 
     # Funnel counts for the UI, computed without touching the disclosure column.
+    yield "step", "counting what the priority date rules out"
     counts_job = client.query(
         search.FUNNEL_COUNTS_SQL.format(**tables),
         job_config=bigquery.QueryJobConfig(query_parameters=params),
     )
     c0 = list(counts_job.result())[0]
+    _eligible = (c0["corpus_size"] - c0["dropped_not_prior_art"]
+                 - c0["dropped_same_family"])
+    yield "fact", (f"{_eligible:,} of {c0['corpus_size']:,} are eligible prior art "
+                   f"on a {c0['target_priority']} priority date")
 
     # Strata for the depth column: the candidate window cut into fixed slices,
     # each carrying the median filing year of the candidates at that depth. The
@@ -128,6 +148,7 @@ def prepare(target_id: str, n_candidates: int, scope: str = "G06Q") -> str:
     GROUP BY slice
     ORDER BY slice
     """
+    yield "step", "measuring the candidate window by filing decade"
     strata = [
         {"slice": int(r["slice"]), "year": int(r["year"] or 0)}
         for r in client.query(
@@ -148,14 +169,27 @@ def prepare(target_id: str, n_candidates: int, scope: str = "G06Q") -> str:
             "corpus_size": c0["corpus_size"],
             "dropped_not_prior_art": c0["dropped_not_prior_art"],
             "dropped_same_family": c0["dropped_same_family"],
-            "eligible": c0["corpus_size"]
-            - c0["dropped_not_prior_art"]
-            - c0["dropped_same_family"],
+            "eligible": _eligible,
             "candidates": n_candidates,
             "model": judge.MODEL,
             "strata": strata,
         },
     )
+    yield "done", run_id
+
+
+def prepare(target_id: str, n_candidates: int, scope: str = "G06Q") -> str:
+    """Build the run's candidate table and Firestore record. Returns run_id.
+
+    The blocking form, for the CLI and the tests. Anything with a person waiting
+    on it should drive `prepare_iter` directly.
+    """
+    run_id = ""
+    for kind, text in prepare_iter(target_id, n_candidates, scope):
+        if kind == "done":
+            run_id = text
+        else:
+            print(text, file=sys.stderr)
     return run_id
 
 
