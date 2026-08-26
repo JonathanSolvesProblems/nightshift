@@ -1,10 +1,11 @@
 # Nightshift
 
-**A patent demand letter costs $5,000 and three weeks to answer. Nightshift ranks 171,695 patents, reads the 2,000 closest against every claim limitation, and hands your attorney the answer for $9.**
+**A patent demand letter takes a professional search and weeks to answer. Nightshift ranks 171,695 patents, reads the 2,000 closest against every claim limitation, and hands your attorney the answer for $9.**
 
-A law firm quotes $5,000 to $15,000 and one to three weeks to answer one question:
-was this patent already invented? Most small companies never ask, because asking
-costs more than settling. Nightshift asks, autonomously, in the background.
+Answering one question, was this already invented, means a prior-art search: a
+specialist, billed by the hour, over days or weeks. Most small companies never
+ask, because asking costs more than settling. Nightshift asks, autonomously, in
+the background.
 
 **Live: https://nightshift-1015687974010.us-central1.run.app**
 
@@ -18,11 +19,17 @@ Built for the All Things Agentic Hackathon, track: **The Taskmaster**.
 
 ## Why this exists
 
-Non-practicing entities bring 63% of US patent litigation. 52% of their targets
-earn under $25M a year, and the median defendant earns $10.8M. Defending through
-trial runs $3M to $5M. The first real question in any of those cases is whether
-the asserted patent was already invented by someone else, and answering it is
-priced out of reach of exactly the companies most often targeted.
+Non-practicing entities filed **55.4% of US patent cases in 2025**, up from 51.8%
+the year before, and drove **90.3% of high-tech patent litigation** ([Unified
+Patents](https://www.unifiedpatents.com/insights/2026/1/13/patent-dispute-report-2025-in-review)).
+They added 2,236 defendants that year, an 18.7% increase.
+
+Defending is expensive even at the small end: AIPLA puts the median cost of a
+suit with **less than $1M at risk at $600,000**, and a case through trial above
+$3M. The first real question in any of them is whether the asserted patent was
+already invented by someone else, and answering it properly means a professional
+prior-art search that is itself priced out of reach of exactly the companies most
+often targeted.
 
 ## What makes it different
 
@@ -128,7 +135,7 @@ that same reference:
 | Wall time | ~4 minutes across 10 Cloud Run tasks |
 | Cost | **$9.09** |
 
-Against the $5,000 to $15,000 and one to three weeks a firm quotes.
+Against a professional search billed by the hour over days or weeks.
 
 Depth 218 is past every shortlist a person is shown. The two patents share almost
 no vocabulary: one calls itself targeted marketing, the other a stored value

@@ -19,8 +19,8 @@ produced, fix that before recording anything.
 
 > A patent holding company sends this letter to a forty-person software company.
 > It asserts one patent. Before anyone can answer it, somebody has to find out
-> whether the invention was already invented, and a law firm quotes five to
-> fifteen thousand dollars and one to three weeks to answer that one question.
+> whether the invention was already invented. That means a prior-art search: a
+> specialist, billed by the hour, over days or weeks.
 >
 > Most companies that get this letter never ask. They settle, because looking
 > costs more than folding.
@@ -100,8 +100,8 @@ lighting up. Right: the actual Cloud Run Jobs console and Vertex AI logs.*
 
 ## 3:40 – 4:00 · Close.
 
-> Five thousand to fifteen thousand dollars and up to three weeks, against one
-> run, and single-digit dollars of Gemini.
+> A specialist billing by the hour over days or weeks, against one run and nine
+> dollars of Gemini.
 >
 > It reports what a reference discloses. Whether the claim is invalid is still a
 > question for a lawyer. This is the evidence that lawyer starts from.

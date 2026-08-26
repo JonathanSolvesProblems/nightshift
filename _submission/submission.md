@@ -17,7 +17,7 @@ Nightshift
 ## Elevator pitch
 
 ```
-A patent demand letter costs $5,000 and three weeks to answer. Nightshift ranks 171,695 patents, reads the 2,000 closest against every claim limitation, and hands your attorney the answer for $9.
+Non-practicing entities filed 55.4% of US patent cases last year. Nightshift ranks 171,695 patents, reads the 2,000 closest against every claim limitation, and hands your attorney the prior art that answers the letter, for $9.
 ```
 
 ## Category
@@ -51,9 +51,11 @@ google-cloud, vertex-ai, gemini, cloud-run, bigquery, firestore, python, fastapi
 ### Inspiration
 
 ```
-Non-practicing entities bring 63% of US patent litigation, and 52% of the companies they target earn under $25 million a year. The median defendant earns $10.8 million. Defending through trial runs $3 to $5 million.
+Non-practicing entities filed 55.4% of US patent cases in 2025, up from 51.8% the year before, and drove 90.3% of high-tech patent litigation (Unified Patents, Patent Dispute Report 2025 in Review). They added 2,236 defendants that year, an 18.7% increase.
 
-The first real question in any of those cases is whether the asserted invention was already invented by somebody else. Answering it means a prior-art search, and a law firm quotes $5,000 to $15,000 and one to three weeks for one. So the companies most often targeted are precisely the ones for whom looking costs more than folding, and they settle without ever finding out whether the patent would have survived.
+Defending is expensive even at the small end. AIPLA puts the median cost of a patent suit with less than $1 million at risk at $600,000, and a case through trial above $3 million.
+
+The first real question in any of those cases is whether the asserted invention was already invented by somebody else. Answering it means a prior-art search: a specialist, billed by the hour, over days or weeks. So the companies most often targeted are precisely the ones for whom looking costs more than folding, and they settle without ever finding out whether the patent would have survived.
 
 I wanted to know what happens to that number if the search runs itself.
 ```

@@ -115,8 +115,7 @@ independently surfaced that same reference.
 | Wall time | ~4 minutes across 10 Cloud Run tasks |
 | Cost | **$9.09** |
 
-Against the $5,000 to $15,000 and one to three weeks a firm quotes for the same
-question.
+Against a professional prior-art search, billed by the hour over days or weeks.
 
 Depth 218 is beyond every shortlist a person is shown. A tool displaying the top
 50 misses it; so does one displaying the top 100. That is not an anecdote about
