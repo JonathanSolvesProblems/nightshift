@@ -13,3 +13,4 @@ google-cloud-run>=0.10.0
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 python-multipart>=0.0.9
+google-adk>=2.7.0
