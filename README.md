@@ -1,6 +1,6 @@
 # Nightshift
 
-**A non-practicing entity sent you a demand letter. Nightshift reads 171,695 patents overnight and hands your attorney the prior art that answers it, by morning.**
+**A patent demand letter costs $5,000 and three weeks to answer. Nightshift ranks 171,695 patents, reads the 2,000 closest against every claim limitation, and hands your attorney the answer for $9.**
 
 A law firm quotes $5,000 to $15,000 and one to three weeks to answer one question:
 was this patent already invented? Most small companies never ask, because asking

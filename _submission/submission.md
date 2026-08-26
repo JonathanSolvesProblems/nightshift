@@ -17,7 +17,7 @@ Nightshift
 ## Elevator pitch
 
 ```
-A patent troll's demand letter costs $5,000 and three weeks to answer. Nightshift reads 171,695 patents overnight and hands your attorney the prior art that answers it by morning.
+A patent demand letter costs $5,000 and three weeks to answer. Nightshift ranks 171,695 patents, reads the 2,000 closest against every claim limitation, and hands your attorney the answer for $9.
 ```
 
 ## Category
@@ -61,7 +61,7 @@ I wanted to know what happens to that number if the search runs itself.
 ### What it does
 
 ```
-You give Nightshift the patent number from a demand letter. It works overnight and hands your attorney a claim chart: every limitation of claim 1, mapped to the prior art that teaches it, with the supporting passage quoted verbatim from the reference.
+You give Nightshift the patent number from a demand letter. It runs unattended and hands your attorney a claim chart: every limitation of claim 1, mapped to the prior art that teaches it, with the supporting passage quoted verbatim from the reference.
 
 It ranks every US patent in the relevant class that predates the asserted patent's priority date, then has Gemini 3.5 Flash actually read thousands of them, one call per candidate, against every limitation. Not a shortlist of fifty for a human to skim. Thousands, read.
 
@@ -128,10 +128,15 @@ Beyond that: the remaining CPC classes, non-patent literature, and IPR petition 
 
 # NOTES, not for pasting
 
-- Elevator pitch is 191 characters. Leads with the human and the cost, not the
-  architecture. "Patent troll" appears here and nowhere in the judged repo or
-  video, where the neutral term "non-practicing entity" is used instead, because
-  the rules bar disparaging content.
+- Elevator pitch is 195 characters. Leads with the human and the cost, not the
+  architecture. The word "troll" appears nowhere in any judged surface; the
+  neutral term "non-practicing entity" is used instead, because the rules bar
+  disparaging content.
+- The pitch says **ranks** 171,695 and **reads** 2,000, and those are different
+  verbs on purpose. An earlier version said "reads 171,695 patents overnight",
+  which the run page itself contradicts: it shows "read by Gemini: 2,000". The
+  tagline is the one sentence most judges read, so it has to survive being
+  checked against the screen.
 - Every figure above is reproducible from the repo: accuracy from
   `python -m priorart.eval`, prefilter recall from `scripts/gate_recall.sql`,
   demo-case selection from `scripts/pick_demo_target.py`.

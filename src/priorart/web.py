@@ -340,9 +340,9 @@ def index():
 
     return shell(
         "Nightshift",
-        "A non-practicing entity sent you a demand letter. Nightshift reads the "
-        "patent record overnight and hands your attorney the prior art that "
-        "answers it.",
+        "A patent demand letter costs $5,000 and three weeks to answer. "
+        "Nightshift ranks 171,695 patents, reads the closest 2,000 against every "
+        "claim limitation, and hands your attorney the answer.",
         f"""
 <div class=well>
   <form method=post action=/run>
