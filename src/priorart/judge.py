@@ -413,3 +413,69 @@ def chart(candidate, limitations: list[Limitation], gc: genai.Client) -> list[Ma
 def normalize_label(s: str) -> str:
     """Limitation labels come back with inconsistent spacing and case."""
     return re.sub(r"\s+", "", s).lower()
+
+
+# ---------------------------------------------------------------------------
+# Reading the letter
+# ---------------------------------------------------------------------------
+
+LETTER_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "patents": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "number": {"type": "STRING"},
+                    "context": {"type": "STRING"},
+                },
+                "required": ["number", "context"],
+            },
+        },
+        "sender": {"type": "STRING"},
+        "is_assertion": {"type": "BOOLEAN"},
+    },
+    "required": ["patents", "sender", "is_assertion"],
+}
+
+
+def read_demand_letter(data: bytes, mime_type: str, gc: genai.Client | None = None) -> dict:
+    """Pull the asserted patent numbers out of a letter, PDF or photograph.
+
+    This is the actual first step of the job. Somebody receives a letter, and
+    before anything can happen a human has to find the patent number in it,
+    strip the commas, and type it somewhere. That is small, and it is also the
+    only part of this whole process that was still manual.
+
+    Gemini reads the document directly: no OCR step, no parsing rules, and a
+    phone photograph of a page works the same as a PDF.
+
+    Returns the patent numbers found, who sent it, and whether the document
+    actually asserts a patent at all, because the honest answer to a holiday
+    photo is "this is not a demand letter" rather than a guess.
+    """
+    gc = gc or client()
+    prompt = (
+        "This document may be a patent demand or assertion letter.\n\n"
+        "Find every US patent being asserted against the recipient. Report each "
+        "number as digits only, with no commas and no 'US' prefix, and give a "
+        "short quote showing where it appears.\n\n"
+        "Do not report patents that are merely mentioned as background, owned by "
+        "the recipient, or listed in a signature block or letterhead. Only "
+        "patents the sender is asserting.\n\n"
+        "If this is not a patent assertion at all, set is_assertion false and "
+        "return an empty list. Do not guess a number that is not there."
+    )
+    resp = gc.models.generate_content(
+        model=MODEL,
+        contents=[
+            types.Part.from_bytes(data=data, mime_type=mime_type),
+            prompt,
+        ],
+        config=_cfg(LETTER_SCHEMA),
+    )
+    data_out = resp.parsed or {}
+    for p in data_out.get("patents", []):
+        p["number"] = "".join(ch for ch in str(p.get("number", "")) if ch.isdigit())
+    return data_out

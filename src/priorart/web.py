@@ -34,7 +34,7 @@ import json
 import os
 import threading
 
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from . import judge, orchestrate, store
@@ -177,6 +177,20 @@ button{background:var(--seam);color:var(--seam-ink);border:0;border-radius:3px;
   letter-spacing:.02em}
 button:hover{filter:brightness(1.08)}
 button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+/* the letter drop: a second way in, deliberately quieter than the first */
+.drop{margin-top:var(--s3);padding-top:var(--s3);border-top:1px dashed var(--hairline);
+  display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
+.drop span{color:var(--ink2);font-size:13px;width:100%}
+.drop input[type=file]{color:var(--ink2);font:13px "Instrument Sans",sans-serif;
+  max-width:100%}
+.drop input[type=file]::file-selector-button{background:var(--field);
+  border:1px solid var(--hairline);color:var(--ink);border-radius:3px;
+  padding:8px var(--s2);margin-right:var(--s2);cursor:pointer;
+  font:13px "Instrument Sans",sans-serif}
+.drop button{background:transparent;color:var(--ink);border:1px solid var(--seam);
+  padding:9px var(--s3)}
+.drop button:hover{background:var(--seam);color:var(--seam-ink);filter:none}
 
 .note{color:var(--ink3);font-size:12.5px;line-height:1.6;margin-top:var(--s2);max-width:74ch}
 .caveat{border-left:2px solid var(--ink3);padding-left:var(--s2);color:var(--ink2);
@@ -398,6 +412,12 @@ def index():
            aria-label="Asserted patent number">
     <button type=submit>Sink a borehole</button>
   </form>
+  <form method=post action=/read-letter enctype=multipart/form-data class=drop>
+    <span>Or hand it the letter and let Gemini find the number</span>
+    <input type=file name=letter accept="application/pdf,image/*" required
+           aria-label="Demand letter, PDF or photo">
+    <button type=submit>Read the letter</button>
+  </form>
   <div class=note>
     Every US patent in CPC G06Q that predates this patent's priority date is
     ranked, and Gemini reads the top {DEFAULT_CANDIDATES:,} of them against every
@@ -412,6 +432,68 @@ def index():
   output is prepared for review by licensed patent counsel.
 </div>
 <div class=note><a href=/eval>How accurate is it, and measured against what</a></div>
+""",
+    )
+
+
+@app.post("/read-letter", response_class=HTMLResponse)
+async def read_letter(letter: UploadFile = File(...)):
+    """Take the letter itself and find the asserted patent in it.
+
+    The first step of this job was always manual: a person reads the letter,
+    finds the number, strips the commas, types it in. Gemini reads the document
+    directly, so a phone photograph of a page works the same as a PDF.
+    """
+    raw = await letter.read()
+    if not raw:
+        return _refused("That file was empty.", "Try the PDF or a photo of the letter.")
+    if len(raw) > 12 * 1024 * 1024:
+        return _refused(
+            "That file is too large.",
+            "Twelve megabytes is the limit. A photo of the page is plenty.",
+        )
+
+    mime = letter.content_type or "application/pdf"
+    try:
+        found = judge.read_demand_letter(raw, mime)
+    except Exception as exc:  # noqa: BLE001
+        return _refused("Could not read that file.", _esc(str(exc)[:180]))
+
+    patents = [p for p in found.get("patents", []) if p.get("number")]
+    if not found.get("is_assertion") or not patents:
+        return _refused(
+            "No asserted patent found in that document.",
+            "Nightshift looks for a US patent number the sender is asserting "
+            "against you. If you know the number, enter it directly.",
+        )
+
+    sender = _esc(found.get("sender") or "the sender")
+    rows = "".join(
+        f"<tr><td class='n num'>US {_esc(p['number'])}</td>"
+        f"<td>{_esc(p.get('context',''))[:150]}</td>"
+        f"<td><form method=post action=/run style='display:inline'>"
+        f"<input type=hidden name=patent value='{_esc(p['number'])}'>"
+        f"<button type=submit>Search this one</button></form></td></tr>"
+        for p in patents[:6]
+    )
+
+    return shell(
+        "Nightshift",
+        "Read from the letter by Gemini",
+        f"""
+<div class=well>
+  <h2>Asserted against you</h2>
+  <div class=note style="margin-bottom:14px">
+    Gemini read the document you uploaded and found
+    {"this patent" if len(patents) == 1 else f"these {len(patents)} patents"}
+    being asserted by {sender}. Nothing was typed in.
+  </div>
+  <div class=scroller><table>
+    <tr><th>patent</th><th>where it appears in the letter</th><th></th></tr>
+    {rows}
+  </table></div>
+</div>
+<div class=note><a href="/">Enter a number instead</a></div>
 """,
     )
 
