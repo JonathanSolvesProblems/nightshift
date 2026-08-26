@@ -351,12 +351,43 @@ def index():
 
 @app.post("/run")
 def start(patent: str = Form(...)):
+    """Start a run, or explain in a sentence why it cannot start.
+
+    Everything that can be known to be impossible is decided here, before a
+    Cloud Run Job is launched. A patent with no claim text or outside the corpus
+    produces a page, not a stack trace, and not a billed run that cannot find
+    anything.
+    """
     pid = "".join(ch for ch in patent if ch.isdigit())
-    run_id = orchestrate.prepare(pid, DEFAULT_CANDIDATES)
+    if not pid:
+        return _refused(
+            f"&ldquo;{_esc(patent[:60])}&rdquo; is not a patent number.",
+            "Enter the number from the demand letter, digits only. "
+            "For example 10140422.",
+        )
+    try:
+        run_id = orchestrate.prepare(pid, DEFAULT_CANDIDATES)
+    except (LookupError, ValueError) as exc:
+        return _refused(f"Cannot search against US {_esc(pid)}.", _esc(str(exc)))
+
     threading.Thread(
         target=orchestrate.launch, args=(run_id, DEFAULT_TASKS), daemon=True
     ).start()
     return RedirectResponse(f"/run/{run_id}", status_code=303)
+
+
+def _refused(headline: str, detail: str) -> HTMLResponse:
+    return shell(
+        "Nightshift",
+        "Prior-art evidence for a patent demand letter",
+        f"""
+<div class=well>
+  <div style="font-size:17px;margin-bottom:10px">{headline}</div>
+  <div class=note>{detail}</div>
+  <div class=note style="margin-top:16px"><a href="/">Try another number</a></div>
+</div>
+""",
+    )
 
 
 @app.get("/api/run/{run_id}")

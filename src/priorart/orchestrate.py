@@ -52,9 +52,33 @@ def prepare(target_id: str, n_candidates: int, scope: str = "G06Q") -> str:
     run_id = f"{target_id}-{uuid.uuid4().hex[:8]}"
     suffix = scope.lower()
 
+    if not str(target_id).isdigit():
+        raise ValueError(
+            f"'{target_id}' is not a patent number. Digits only, for example 10140422."
+        )
+
     target = corpus.get_target(target_id, scope)
+
+    # Refuse before spending anything.
+    #
+    # patentsview.claim has no rows for grants from 2020 onward, so those
+    # patents are in the corpus with empty claim text. Without this guard the
+    # orchestrator happily split nothing into zero limitations, materialized a
+    # candidate table, and launched ten Cloud Run tasks to screen candidates
+    # against no claim at all: a run that cannot produce a finding, billed in
+    # full.
+    if not target.claim_1.strip():
+        raise ValueError(
+            f"US {target_id} has no claim text in this corpus. Issued claim text "
+            "ends in 2019, so grants from 2020 onward cannot be analysed here."
+        )
+
     gc = judge.client()
     limitations = judge.split_claim(target.claim_1, gc)
+    if not limitations:
+        raise ValueError(
+            f"Claim 1 of US {target_id} could not be split into limitations."
+        )
     print(f"claim 1 -> {len(limitations)} limitations", file=sys.stderr)
 
     client = bigquery.Client(project=config.PROJECT_ID, location=config.LOCATION)
