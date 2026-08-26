@@ -225,8 +225,20 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   .core,.ruler{min-height:220px}
   .lim{grid-template-columns:1fr;gap:var(--s2)}
 }
+@media (max-width:860px){
+  /* six stages will not fit a phone. Two rows of three keeps the sequence
+     readable left-to-right rather than squeezing it into an unreadable strip. */
+  .string{grid-template-columns:repeat(3,1fr)}
+  .stg:nth-child(3){border-right:0}
+  .stg:nth-child(-n+3){border-bottom:1px solid var(--hairline)}
+}
 @media (max-width:520px){
   body{padding:var(--s3) var(--s2)}
+  .string{grid-template-columns:repeat(2,1fr)}
+  .stg{border-right:1px solid var(--hairline)}
+  .stg:nth-child(2n){border-right:0}
+  .stg:nth-child(-n+4){border-bottom:1px solid var(--hairline)}
+  .stg-n{font-size:17px}
   /* The form is one control per line rather than a row that does not fit. */
   form{display:flex;flex-wrap:wrap;gap:var(--s2)}
   input[type=text]{width:100%}
