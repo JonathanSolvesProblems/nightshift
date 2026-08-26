@@ -61,7 +61,10 @@ CSS = """
 @media (prefers-color-scheme: light){
   :root{
     --field:#D8DBD5; --well:#C6CAC3; --raised:#E4E7E1; --hairline:#B0B5AC;
-    --ink:#1F2422; --ink2:#4C5451; --ink3:#6F7873;
+    /* ink3 is darker than its dark-theme counterpart on purpose: against the
+       light well it measured 2.74:1, under the 3:1 floor. Both palettes are
+       designed, not inverted, so the tertiary tone is not the same value. */
+    --ink:#1F2422; --ink2:#4C5451; --ink3:#565E5A;
     --seam:#4F7318; --seam-ink:#F2F5EE;
   }
 }
@@ -172,10 +175,24 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .level.absent{color:var(--ink3)}
 .why{color:var(--ink2);font-size:12.5px;line-height:1.55}
 
+/* Wide content scrolls inside its own container. The seam table has six columns
+   and the page body must never scroll sideways to accommodate it. */
+.scroller{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.scroller table{min-width:620px}
+
 @media (max-width:760px){
   .rig{grid-template-columns:1fr}
   .core,.ruler{min-height:220px}
   .lim{grid-template-columns:1fr;gap:var(--s2)}
+}
+@media (max-width:520px){
+  body{padding:var(--s3) var(--s2)}
+  /* The form is one control per line rather than a row that does not fit. */
+  form{display:flex;flex-wrap:wrap;gap:var(--s2)}
+  input[type=text]{width:100%}
+  button{width:100%}
+  .funnel{grid-template-columns:1fr auto}
+  .exhibit-head,.lim,.well{padding:var(--s2)}
 }
 @media (prefers-reduced-motion:reduce){
   *{transition:none !important;animation:none !important}
@@ -313,8 +330,9 @@ def index():
         for r in store.recent_runs(10)
     )
     table = (
-        "<table><tr><th>run</th><th>patent</th><th>read</th><th>state</th></tr>"
-        f"{rows}</table>"
+        "<div class=scroller><table>"
+        "<tr><th>run</th><th>patent</th><th>read</th><th>state</th></tr>"
+        f"{rows}</table></div>"
         if rows
         else "<div class=note>No runs yet.</div>"
     )
@@ -455,9 +473,9 @@ def run_page(run_id: str):
 </div>
 <div class=well>
   <h2>Seams</h2>
-  <table><thead><tr><th>depth</th><th>reference</th><th>filed</th><th>tier</th>
+  <div class=scroller><table><thead><tr><th>depth</th><th>reference</th><th>filed</th><th>tier</th>
   <th>lims</th><th>what it discloses</th></tr></thead>
-  <tbody id=rows></tbody></table>
+  <tbody id=rows></tbody></table></div>
 </div>
 """.replace("__RID__", run_id),
         JS.replace("__RID__", run_id),
