@@ -17,7 +17,7 @@ Nightshift
 ## Elevator pitch
 
 ```
-Non-practicing entities filed 55.4% of US patent cases last year. Nightshift ranks 171,695 patents, reads the 2,000 closest against every claim limitation, and hands your attorney the prior art that answers the letter, for $34.
+Most companies that get a patent demand letter settle without ever checking. Nightshift reads 2,000 patents against every limitation of the claim and hands your attorney the art that answers it, for $34.
 ```
 
 ## Category
@@ -110,6 +110,10 @@ Blinded, with the reference's number, title, assignee and dates stripped from th
 And the number that explains why the architecture looks like this. Ranking the corpus with gemini-embedding-001, the strongest embedding available, a top-50 shortlist still misses 59.7% of the references examiners actually applied. Every commercial patent tool ranks a corpus and shows a person the top few dozen results, and no amount of ranking quality rescues that design. Reading 2,000 finds 83.9%.
 
 But the result I am most pleased with is one the scoring counts against me. On the demo patent, the examiner applied US 7,606,730, which teaches two of the seven limitations outright. At depth 1,129 Nightshift found US 6,564,189, filed eight years before the priority date, absent from the examiner's citations entirely, teaching six of seven outright. Because accuracy here is measured against the examiner, that reference is scored as a MISS. The published numbers understate the tool by exactly the amount an examiner's own search understates the art, and I would rather report it that way than move the goalposts.
+
+The agent also knows what it costs and refuses to spend without saying so. An agent that fans out across a corpus is an agent that can spend real money on your behalf, and the hosted one here is public. Reading is open to anyone: every finished run, both claim charts, the accuracy page, and the letter intake, which is a live Gemini vision call. Starting a new search is not, because it costs about $34, so it takes a token and it is capped per day, claimed in a Firestore transaction so two concurrent presses cannot both pass and failing closed if the counter cannot be read.
+
+Before either limit is consulted, a patent that has already been searched returns its finished run rather than a new one, which is both free and a faster answer. The refusal page states the price and the command to run it yourself. I would rather a reviewer meet a button that explains why it will not spend than one that quietly does.
 ```
 
 ### What I learned
@@ -120,14 +124,24 @@ That measuring the pipeline in stages is what tells you where to spend.
 Splitting recall into "did the prefilter keep the reference" and "did the model then flag it" showed the loss was almost entirely in retrieval: the model was missing 2.5% of what reached it while the prefilter was dropping 46%. That pointed at re-embedding the corpus with gemini-embedding-001, which took anticipation recall at 2,000 candidates from 54.0% to 83.9% and the median rank of an examiner's reference from 1,230 to 128.
 
 It also cost me my favourite demo. The case I had been showing sat at depth 548, and under the better prefilter it ranks 16, so it stopped demonstrating anything and had to be replaced. The honest argument turned out to be stronger than the anecdote: even with the best embedding available, a top-50 shortlist misses 59.7% of examiner-applied references. That is a property of the whole population, not one lucky patent.
+
+And that a system can be wrong about itself in a direction no test catches. Nightshift reported the cost of every run, computed from Vertex list price and the token counts the API returns, and it was wrong by a factor of four. It read usage_metadata.candidates_token_count, which is only the visible JSON. Gemini 3.5 Flash thinks by default, reports those tokens separately as thoughts_token_count, and Vertex bills them at the output rate. On this workload thinking runs about eleven times the size of the visible answer.
+
+Nothing failed. Every test passed, the arithmetic was right, and the number was wrong, because the input to the arithmetic measured the wrong half of what was being billed. I found it in a billing alert rather than in the code, corrected the demo run from $9.09 to $34.57, and re-derived it two independent ways: re-screening 60 real candidates with thinking counted extrapolates to $35.87, and reconciling recorded tokens against the billing console gives $34.57. The figure in this writeup is the corrected one, and ACCURACY.md states what it was before.
+
+The lesson generalises past this bug. A metric your own system computes about itself is not evidence, it is a claim, and it needs a source outside the system to check it against. That is the same reason the accuracy numbers here are measured against USPTO examiner citations rather than against my own judgement of what looks relevant.
 ```
 
 ### What's next for Nightshift
 
 ```
-Pre-grant publications are 73% of what examiners actually cite, and the corpus holds 413,323 of them but the pipeline does not yet screen them. That is the single largest available gain in recall.
+Pre-grant publications are 73% of what examiners actually cite, and the corpus already holds 413,323 of them but the pipeline does not yet screen them. That is the single largest available gain in recall, and it is a decision about money rather than engineering: the retrieval and screening code does not care which table a candidate came from, but reading another 413,323 documents costs what it costs, and I would rather ship a measured number over 171,695 than an unmeasured one over half a million.
 
-Beyond that: the remaining CPC classes, non-patent literature, and IPR petition grounds under 35 U.S.C. 311(b), which restricts inter partes review to patents and printed publications and therefore makes a patents-first corpus exactly the right shape.
+Depth is the other axis. Every accuracy figure here is quoted at 2,000 candidates because that is what I could afford to measure repeatedly. Recall rises with depth by construction, since the prefilter is what loses references and reading further loses fewer, so 5,000 and 10,000 are straightforward and simply cost more. The interesting question is where it stops paying, and that curve is measurable rather than arguable.
+
+Then the remaining CPC classes, and non-patent literature, which is the largest blind spot in the current design: a journal paper or a product manual can invalidate a claim and this corpus contains neither.
+
+Further out, the thing this shape is actually for. IPR petition grounds under 35 U.S.C. 311(b) restrict inter partes review to patents and printed publications, which is exactly the material a patents-first corpus holds, and a petition is built from claim charts. The chart Nightshift already produces, limitation by limitation with each passage quoted verbatim from the reference, is the same artifact in a rougher form. Getting from one to the other is a question of rigour and of counsel's review, not of a different system.
 ```
 
 ---
