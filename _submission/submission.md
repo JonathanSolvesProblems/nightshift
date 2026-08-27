@@ -51,13 +51,13 @@ google-cloud, vertex-ai, gemini, google-adk, google-genai, cloud-run, cloud-run-
 ### Inspiration
 
 ```
-Non-practicing entities filed 55.4% of US patent cases in 2025, up from 51.8% the year before, and drove 90.3% of high-tech patent litigation (Unified Patents, Patent Dispute Report 2025 in Review). They added 2,236 defendants that year, an 18.7% increase.
+A company gets a letter saying it infringes a patent. The first real question is whether somebody had already invented the thing. Most of them never find out.
 
-Defending is expensive even at the small end. AIPLA puts the median cost of a patent suit with less than $1 million at risk at $600,000, and a case through trial above $3 million.
+Finding out means a prior-art search: a specialist, billed by the hour, over days or weeks. Defending is expensive even at the small end, and AIPLA puts the median cost of a patent suit with less than $1 million at risk at $600,000, a case through trial above $3 million. So the companies most often targeted are exactly the ones for whom looking costs more than folding. They settle without ever learning whether the patent would have survived.
 
-The first real question in any of those cases is whether the asserted invention was already invented by somebody else. Answering it means a prior-art search: a specialist, billed by the hour, over days or weeks. So the companies most often targeted are precisely the ones for whom looking costs more than folding, and they settle without ever finding out whether the patent would have survived.
+There are more of them every year. Non-practicing entities filed 55.4% of US patent cases in 2025, up from 51.8% the year before, and drove 90.3% of high-tech patent litigation (Unified Patents, Patent Dispute Report 2025 in Review). They added 2,236 defendants that year, an 18.7% increase.
 
-I wanted to know what happens to that number if the search runs itself.
+I wanted to know what happens to that if the search runs itself while everyone is asleep.
 ```
 
 ### What it does
