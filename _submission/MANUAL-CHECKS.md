@@ -114,23 +114,27 @@ E1 is free and is the strongest single check.
 The cut face only animates while candidates are being screened. A finished run
 shows empty lanes, so the only way to see it is to watch one.
 
-**The public deployment will not start a new search.** The hackathon credit is
-spent and a run costs about $34, so `PRIOR_ART_DAILY_RUNS` defaults to 0: a
-patent already searched opens its finished run instantly, a new one gets a page
-explaining why not. To record, turn it on for the session and off afterwards:
+**Reading is public; spending needs the tester link.** A run costs about $34 and
+the credit is spent, so `/run` refuses unless the request carries
+`PRIOR_ART_RUN_TOKEN`. The token is in `.secrets/run-token.txt`, which is
+gitignored and never appears in any tracked file. Your link:
 
-```bash
-gcloud run services update nightshift --region us-central1 \
-  --project prior-art-agent-2026 --update-env-vars PRIOR_ART_DAILY_RUNS=1
-# ... record ...
-gcloud run services update nightshift --region us-central1 \
-  --project prior-art-agent-2026 --update-env-vars PRIOR_ART_DAILY_RUNS=0
+```
+https://nightshift-1015687974010.us-central1.run.app/tester?t=<token>
 ```
 
-With it on, **start it from the site, not the terminal**, because the browser
-path is the one a judge sees. Enter 10163121 on the home page (then "Search it
-again anyway", since it is already searched), or upload the letter from section
-B and click "Search this one".
+That page is the ordinary site with one difference: the search button really
+runs, and the page says so, including the price. Everything else, the finished
+runs, both charts, the accuracy page and the letter intake, is open at the plain
+URL with no link needed.
+
+A daily ceiling of one new run backs the token up, counted in a Firestore
+transaction, so even a leaked link cannot spend more than $34 in a day.
+
+**Start from the tester link, not the terminal**, because the browser path is the
+one a judge sees. Enter 10163121 on that page (then "Search it again anyway",
+since it is already searched), or upload the letter from section B and click
+"Search this one".
 
 What should happen, in order:
 

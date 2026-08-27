@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import time
 
 from google.cloud import run_v2
@@ -49,19 +50,15 @@ app = FastAPI(title="Nightshift")
 
 DEFAULT_TASKS = int(os.environ.get("PRIOR_ART_TASKS", "10"))
 DEFAULT_CANDIDATES = int(os.environ.get("PRIOR_ART_CANDIDATES", "2000"))
-# Starting a new search costs about thirty-four dollars of Gemini, and the
-# hackathon credit that paid for the runs already recorded is spent. So the
-# public deployment reads: every finished run, every chart and the letter intake
-# stay open, and starting a NEW billed search is off unless someone deliberately
-# turns it on for a recording session.
-#
-#   gcloud run services update nightshift --region us-central1 \
-#     --update-env-vars PRIOR_ART_DAILY_RUNS=1
-#
-# Zero is the default rather than a large number because the endpoint is public
-# and unauthenticated, and a ceiling that depends on nobody finding the button is
-# not a ceiling.
-DAILY_RUN_CAP = int(os.environ.get("PRIOR_ART_DAILY_RUNS", "0"))
+# Two independent limits on the one action that spends real money, because
+# either alone is thin. The token decides who may start a run; the daily cap
+# decides how much a leaked token, or a tester holding the button down, can cost.
+# A ceiling that depends on nobody finding the button is not a ceiling.
+DAILY_RUN_CAP = int(os.environ.get("PRIOR_ART_DAILY_RUNS", "1"))
+# Reading is public. Spending is not. A judge who wants to watch a real run gets
+# a link carrying this key; anyone else gets the site with the expensive button
+# refusing and saying why. Unset means nobody can start a run at all.
+RUN_TOKEN = os.environ.get("PRIOR_ART_RUN_TOKEN", "")
 # Reading a letter is one Gemini vision call, about a cent. Bounded anyway,
 # because "about a cent" times a crawler is not about a cent.
 DAILY_LETTER_CAP = int(os.environ.get("PRIOR_ART_DAILY_LETTERS", "200"))
@@ -618,33 +615,77 @@ def shell(title: str, sub: str, body: str, script: str = "") -> HTMLResponse:
     )
 
 
-def _run_budget_note(runs: list[dict]) -> str:
+def _is_tester(token: str) -> bool:
+    """Whether this request carries the key that is allowed to spend money.
+
+    The gate is on the one expensive action, never on reading. A judge who
+    follows a bare link must land on a working site: an entry that greets its
+    reviewers with a password box scores whatever a reviewer gives a page they
+    could not open.
+    """
+    if not RUN_TOKEN or not token:
+        return False
+    return secrets.compare_digest(str(token), RUN_TOKEN)
+
+
+def _tok_field(token: str) -> str:
+    if not token:
+        return ""
+    return f"<input type=hidden name=token value='{_esc(token)}'>"
+
+
+def _run_budget_note(runs: list[dict], token: str = "") -> str:
     """Say up front what a press of the button will and will not do.
 
     A button that refuses is only honest if it says so before it is pressed
     rather than after, and more useful still if it names the numbers that work.
     """
-    if DAILY_RUN_CAP > 0:
-        return ""
-
     ready = sorted({str(r.get("target")) for r in runs if r.get("status") == "done"})
     names = ", ".join(f"<b>{_esc(t)}</b>" for t in ready)
     lead = (f"Already searched: {names}. Enter one of those and its finished run "
             "opens straight away. ") if ready else ""
+
+    if _is_tester(token):
+        body = (
+            lead
+            + "You are on the tester link, so the search button will really run: "
+            f"2,000 patents read by Gemini across {DEFAULT_TASKS} Cloud Run tasks, "
+            "about four minutes, about <b>$34</b> of real money. Enter a patent not "
+            "in the list above, or use the list and choose to search it again. "
+            f"{DAILY_RUN_CAP} new search per day."
+        )
+    else:
+        body = (
+            lead
+            + "Starting a <em>new</em> search reads 2,000 patents with Gemini for "
+            "about $34. This link will not spend that, so it refuses and explains "
+            "rather than pretending the button is not there. Reading a letter still "
+            "works; it costs about a cent."
+        )
+
     return (
         "<div class=note style='margin-top:14px;border-top:1px solid var(--hairline);"
-        "padding-top:14px'>"
-        + lead +
-        "Starting a <em>new</em> search reads 2,000 patents with Gemini for about "
-        "$34, and this public deployment will not spend that, so it refuses and "
-        "explains rather than pretending the button is not there. Reading a letter "
-        "still works; it costs about a cent."
-        "</div>"
+        "padding-top:14px'>" + body + "</div>"
     )
 
 
 @app.get("/", response_class=HTMLResponse)
 def index():
+    return _home("")
+
+
+@app.get("/tester", response_class=HTMLResponse)
+def tester(t: str = ""):
+    """The same site, from a link that is allowed to spend.
+
+    Handed to judges. Everything on it is what a visitor to `/` sees; the only
+    difference is that the search button will actually start a run, which is the
+    one action on this service that costs real money.
+    """
+    return _home(t if _is_tester(t) else "")
+
+
+def _home(token: str):
     recent = store.recent_runs(10)
     rows = "".join(
         f"<tr><td class='n num'><a href='/run/{r.get('run_id','')}'>"
@@ -671,13 +712,13 @@ def index():
 <div class=well>
   <form method=post action=/run>
     <input type=text name=patent placeholder="Asserted patent number" required
-           aria-label="Asserted patent number">
+           aria-label="Asserted patent number">{_tok_field(token)}
     <button type=submit>Sink a borehole</button>
   </form>
   <form method=post action=/read-letter enctype=multipart/form-data class=drop>
     <span>Or hand it the letter and let Gemini find the number</span>
     <input type=file name=letter accept="application/pdf,image/*" required
-           aria-label="Demand letter, PDF or photo">
+           aria-label="Demand letter, PDF or photo">{_tok_field(token)}
     <button type=submit>Read the letter</button>
   </form>
   <div class=note>
@@ -686,7 +727,7 @@ def index():
     limitation of claim 1. The work runs across {DEFAULT_TASKS} Cloud Run tasks.
     Close the tab; the run continues without you.
   </div>
-  {_run_budget_note(recent)}
+  {_run_budget_note(recent, token)}
 </div>
 <div class=well><h2>Recent boreholes</h2>{table}</div>
 <div class=caveat>
@@ -700,7 +741,7 @@ def index():
 
 
 @app.post("/read-letter", response_class=HTMLResponse)
-async def read_letter(letter: UploadFile = File(...)):
+async def read_letter(letter: UploadFile = File(...), token: str = Form("")):
     """Take the letter itself and find the asserted patent in it.
 
     The first step of this job was always manual: a person reads the letter,
@@ -745,6 +786,7 @@ async def read_letter(letter: UploadFile = File(...)):
         f"<td>{_esc(p.get('context',''))[:150]}</td>"
         f"<td><form method=post action=/run style='display:inline'>"
         f"<input type=hidden name=patent value='{_esc(p['number'])}'>"
+        f"{_tok_field(token)}"
         f"<button type=submit>Search this one</button></form></td></tr>"
         for p in patents[:6]
     )
@@ -771,7 +813,7 @@ async def read_letter(letter: UploadFile = File(...)):
 
 
 @app.post("/run")
-def start(patent: str = Form(...), force: int = Form(0)):
+def start(patent: str = Form(...), force: int = Form(0), token: str = Form("")):
     """Start a run, or explain in a sentence why it cannot start.
 
     Everything that can be known to be impossible is decided here, before a
@@ -797,19 +839,20 @@ def start(patent: str = Form(...), force: int = Form(0)):
     if not force:
         prior = store.completed_run_for(pid)
         if prior:
-            return _already_searched(pid, prior)
+            return _already_searched(pid, prior, token)
 
-    if DAILY_RUN_CAP <= 0:
+    if not _is_tester(token):
         return _refused(
             f"US {_esc(pid)} has not been searched, and this deployment will not "
             "start a new one.",
             "Reading 2,000 patents against every limitation of a claim costs about "
-            "thirty-four dollars of Gemini, and the hackathon credit that paid for "
-            "the runs on this site is spent. Rather than take the button away, it "
-            "refuses and says why. Everything already searched is open: the runs on "
-            "the home page, their claim charts, the accuracy page, and the letter "
-            "intake, which reads a real demand letter with Gemini and costs about a "
-            "cent.<br><br>To run this patent yourself against your own project, the "
+            "thirty-four dollars of Gemini, and the credit that paid for the runs on "
+            "this site is spent, so starting one needs a tester link. Rather than "
+            "take the button away, it refuses and says why.<br><br>Everything already "
+            "searched is open without any link: the runs on the home page, their "
+            "claim charts, the accuracy page, and the letter intake, which reads a "
+            "real demand letter with Gemini and costs about a cent.<br><br>To run "
+            "this patent yourself against your own project, the "
             "repository is at "
             "<a href='https://github.com/JonathanSolvesProblems/nightshift'>"
             "github.com/JonathanSolvesProblems/nightshift</a> and the command is "
@@ -886,7 +929,7 @@ def _sink(pid: str):
            f'<script>location.replace("/run/{run_id}")</script></body></html>')
 
 
-def _already_searched(pid: str, prior: dict) -> HTMLResponse:
+def _already_searched(pid: str, prior: dict, token: str = "") -> HTMLResponse:
     """Hand back the finished run rather than paying to reproduce it."""
     when = time.strftime("%Y-%m-%d %H:%M UTC",
                          time.gmtime(prior.get("created_at") or 0))
@@ -910,7 +953,7 @@ def _already_searched(pid: str, prior: dict) -> HTMLResponse:
   </div>
   <form method=post action=/run style="margin-top:14px">
     <input type=hidden name=patent value="{_esc(pid)}">
-    <input type=hidden name=force value="1">
+    <input type=hidden name=force value="1">{_tok_field(token)}
     <button type=submit>Search it again anyway</button>
   </form>
   <div class=note style="margin-top:16px"><a href="/">Search a different patent</a></div>

@@ -41,7 +41,7 @@ https://nightshift-1015687974010.us-central1.run.app
 ## Built with
 
 ```
-google-cloud, vertex-ai, gemini, cloud-run, bigquery, firestore, python, fastapi, uspto
+google-cloud, vertex-ai, gemini, google-adk, google-genai, cloud-run, cloud-run-jobs, bigquery, firestore, python, fastapi, uspto
 ```
 
 ---
@@ -63,11 +63,13 @@ I wanted to know what happens to that number if the search runs itself.
 ### What it does
 
 ```
-You give Nightshift the patent number from a demand letter. It runs unattended and hands your attorney a claim chart: every limitation of claim 1, mapped to the prior art that teaches it, with the supporting passage quoted verbatim from the reference.
+A demand letter arrives. You hand Nightshift the letter itself, a PDF or a photo of the page, and Gemini reads the document: who is asserting, which patent, and whether it is an assertion at all. Nothing is typed in.
 
-It ranks every US patent in the relevant class that predates the asserted patent's priority date, then has Gemini 3.5 Flash actually read thousands of them, one call per candidate, against every limitation. Not a shortlist of fifty for a human to skim. Thousands, read.
+That one event starts the job, and nothing after it is guided. Nightshift splits claim 1 into its limitations, works out the priority date and drops every patent that cannot legally be prior art against it, ranks the survivors by embedding distance, spreads the closest 2,000 across ten Cloud Run tasks, and has Gemini 3.5 Flash read every one of them against every limitation. One call per candidate. Not a shortlist of fifty for a human to skim. Thousands, read.
 
-The output states what each reference discloses. It never states that a claim is invalid, because that is a question for licensed counsel and ultimately for a court or the PTAB.
+It coordinates BigQuery, Vertex AI, Cloud Run Jobs and Firestore to do it, deciding at each step what the next one should be, and it runs unattended. Close the tab and the work carries on without you.
+
+What comes back is a claim chart: every limitation of claim 1 mapped to the prior art that teaches it, with the supporting passage quoted verbatim from the reference. It states what each reference discloses. It never states that a claim is invalid, because that is a question for licensed counsel and ultimately for a court or the PTAB.
 ```
 
 ### How I built it

@@ -207,15 +207,24 @@ partitioned nor clustered on patent id.
 So the corpus is materialized once and clustered. A target fetch went from
 40.16 GB to **0.20 GB**, a factor of about 200.
 
-### The live deployment is read-only for new searches
+### Reading is public. Spending is gated.
 
 Every finished run, every claim chart, the accuracy page and the letter intake
-are open at the URL above. Starting a **new** search is not, because it reads
-2,000 patents with Gemini for about $34 and `/run` is a public unauthenticated
-endpoint. A patent already searched returns its finished run immediately; a new
-one returns a page saying what it would cost and how to run it yourself. Set
-`PRIOR_ART_DAILY_RUNS` to re-enable, and it is capped per day, counted in a
-Firestore transaction so concurrent presses cannot both pass.
+are open at the URL above with no key and no sign-in. Reviewers should never meet
+a password box.
+
+Starting a **new** search is the one action that costs real money: 2,000 patents
+read by Gemini, about $34. So it takes two independent limits.
+
+- **A token.** `/run` refuses unless the request carries `PRIOR_ART_RUN_TOKEN`.
+  A tester follows `/tester?t=<token>`, which is the ordinary site with the
+  search button live, and the page says so including the price.
+- **A daily ceiling.** At most `PRIOR_ART_DAILY_RUNS` new searches per day,
+  claimed in a Firestore transaction so two concurrent presses cannot both pass,
+  and failing closed if the counter cannot be read. A leaked token costs one run.
+
+Before either is consulted, a patent already searched returns its finished run
+instead of a new one, which is both free and a faster answer.
 
 This is not a demo restriction bolted on afterwards. The cost of a run is the
 central design constraint of the whole system, and a public button that spends
