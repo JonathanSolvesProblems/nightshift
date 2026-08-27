@@ -44,6 +44,12 @@ Use a **private/incognito window**. The point is to see what a judge sees.
 | A9 | Switch OS to light mode, reload | Pale mineral stock, deep olive accent, all readable | Anything washed out |
 | A10 | Narrow the window to phone width | Rail stacks to two columns, nothing scrolls sideways | A horizontal scrollbar |
 | A11 | [A run that has not started](https://nightshift-1015687974010.us-central1.run.app/run/10163121-3ae65353) | Every count filled in | A dash where a count should be |
+| A12 | Home, type `10163121`, submit | "This one has been searched", instantly, spending nothing | A new run starts |
+| A13 | Home, type `7606730`, submit | A page saying it will not start a new search, with the cost and the CLI command | A new run starts |
+
+A12 and A13 are the spend guard. A13 is the one that matters: the button is
+public and unauthenticated, and a new search costs about $34 of Gemini, so it
+refuses and explains rather than quietly spending.
 
 A11 is about the opposite case, and it is easier to check on a run you start
 yourself (section F). Before a task has read anything, "read by Gemini" and
@@ -108,8 +114,22 @@ E1 is free and is the strongest single check.
 The cut face only animates while candidates are being screened. A finished run
 shows empty lanes, so the only way to see it is to watch one.
 
-**Start it from the site, not the terminal**, because the browser path is the one
-a judge sees. Enter 10163121 on the home page, or upload the letter from section
+**The public deployment will not start a new search.** The hackathon credit is
+spent and a run costs about $34, so `PRIOR_ART_DAILY_RUNS` defaults to 0: a
+patent already searched opens its finished run instantly, a new one gets a page
+explaining why not. To record, turn it on for the session and off afterwards:
+
+```bash
+gcloud run services update nightshift --region us-central1 \
+  --project prior-art-agent-2026 --update-env-vars PRIOR_ART_DAILY_RUNS=1
+# ... record ...
+gcloud run services update nightshift --region us-central1 \
+  --project prior-art-agent-2026 --update-env-vars PRIOR_ART_DAILY_RUNS=0
+```
+
+With it on, **start it from the site, not the terminal**, because the browser
+path is the one a judge sees. Enter 10163121 on the home page (then "Search it
+again anyway", since it is already searched), or upload the letter from section
 B and click "Search this one".
 
 What should happen, in order:

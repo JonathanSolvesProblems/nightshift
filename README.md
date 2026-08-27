@@ -207,6 +207,20 @@ partitioned nor clustered on patent id.
 So the corpus is materialized once and clustered. A target fetch went from
 40.16 GB to **0.20 GB**, a factor of about 200.
 
+### The live deployment is read-only for new searches
+
+Every finished run, every claim chart, the accuracy page and the letter intake
+are open at the URL above. Starting a **new** search is not, because it reads
+2,000 patents with Gemini for about $34 and `/run` is a public unauthenticated
+endpoint. A patent already searched returns its finished run immediately; a new
+one returns a page saying what it would cost and how to run it yourself. Set
+`PRIOR_ART_DAILY_RUNS` to re-enable, and it is capped per day, counted in a
+Firestore transaction so concurrent presses cannot both pass.
+
+This is not a demo restriction bolted on afterwards. The cost of a run is the
+central design constraint of the whole system, and a public button that spends
+real money per press has to have a ceiling that does not depend on who finds it.
+
 ```
 demand letter
   -> target patent + claim limitations

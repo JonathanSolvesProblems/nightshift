@@ -178,8 +178,8 @@ def completed_run_for(target: str, candidates: int) -> dict | None:
     return None
 
 
-def claim_daily_run(limit: int) -> tuple[bool, int]:
-    """Count one web-initiated run against today's cap. Returns (allowed, used).
+def claim_daily_run(limit: int, kind: str = "run") -> tuple[bool, int]:
+    """Count one billable web action against today's cap. Returns (allowed, used).
 
     The service is public and unauthenticated, and its main button spends real
     money on Gemini. Without a ceiling, one crawler or one judge with a fast
@@ -187,8 +187,11 @@ def claim_daily_run(limit: int) -> tuple[bool, int]:
     alert the next morning. The cap is transactional because Cloud Run serves
     concurrent requests and two clicks landing together must not both pass.
     """
+    if limit <= 0:
+        return False, 0
+
     day = time.strftime("%Y-%m-%d", time.gmtime())
-    ref = db().collection("meta").document("spend")
+    ref = db().collection("meta").document(f"spend-{kind}")
 
     @firestore.transactional
     def _claim(tx):

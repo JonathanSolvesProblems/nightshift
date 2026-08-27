@@ -49,10 +49,22 @@ app = FastAPI(title="Nightshift")
 
 DEFAULT_TASKS = int(os.environ.get("PRIOR_ART_TASKS", "10"))
 DEFAULT_CANDIDATES = int(os.environ.get("PRIOR_ART_CANDIDATES", "2000"))
-# A public button that spends about thirty-four dollars a press needs a ceiling
-# that does not depend on anyone behaving. Raise it from the environment for a
-# recording session, not in code.
-DAILY_RUN_CAP = int(os.environ.get("PRIOR_ART_DAILY_RUNS", "1"))
+# Starting a new search costs about thirty-four dollars of Gemini, and the
+# hackathon credit that paid for the runs already recorded is spent. So the
+# public deployment reads: every finished run, every chart and the letter intake
+# stay open, and starting a NEW billed search is off unless someone deliberately
+# turns it on for a recording session.
+#
+#   gcloud run services update nightshift --region us-central1 \
+#     --update-env-vars PRIOR_ART_DAILY_RUNS=1
+#
+# Zero is the default rather than a large number because the endpoint is public
+# and unauthenticated, and a ceiling that depends on nobody finding the button is
+# not a ceiling.
+DAILY_RUN_CAP = int(os.environ.get("PRIOR_ART_DAILY_RUNS", "0"))
+# Reading a letter is one Gemini vision call, about a cent. Bounded anyway,
+# because "about a cent" times a crawler is not about a cent.
+DAILY_LETTER_CAP = int(os.environ.get("PRIOR_ART_DAILY_LETTERS", "200"))
 
 FONTS = (
     "https://fonts.googleapis.com/css2?"
@@ -606,6 +618,26 @@ def shell(title: str, sub: str, body: str, script: str = "") -> HTMLResponse:
     )
 
 
+def _run_budget_note() -> str:
+    """Say up front what a press of the button will and will not do.
+
+    A button that refuses is only honest if it says so before it is pressed
+    rather than after.
+    """
+    if DAILY_RUN_CAP > 0:
+        return ""
+    return (
+        "<div class=note style='margin-top:14px;border-top:1px solid var(--hairline);"
+        "padding-top:14px'>"
+        "A patent already searched below opens its finished run straight away. "
+        "Starting a <em>new</em> search reads 2,000 patents with Gemini for about "
+        "$34, and this public deployment will not spend that, so it refuses and "
+        "explains rather than pretending the button is not there. Reading a letter "
+        "still works; it costs about a cent."
+        "</div>"
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     rows = "".join(
@@ -648,6 +680,7 @@ def index():
     limitation of claim 1. The work runs across {DEFAULT_TASKS} Cloud Run tasks.
     Close the tab; the run continues without you.
   </div>
+  {_run_budget_note()}
 </div>
 <div class=well><h2>Recent boreholes</h2>{table}</div>
 <div class=caveat>
@@ -675,6 +708,15 @@ async def read_letter(letter: UploadFile = File(...)):
         return _refused(
             "That file is too large.",
             "Twelve megabytes is the limit. A photo of the page is plenty.",
+        )
+
+    allowed, _ = store.claim_daily_run(DAILY_LETTER_CAP, kind="letter")
+    if not allowed:
+        return _refused(
+            "Not reading another letter today.",
+            "Reading a document is a Gemini vision call, and this deployment caps "
+            "how many it will make in a day. Try tomorrow, or enter the patent "
+            "number directly.",
         )
 
     mime = letter.content_type or "application/pdf"
@@ -751,11 +793,28 @@ def start(patent: str = Form(...), force: int = Form(0)):
         if prior:
             return _already_searched(pid, prior)
 
+    if DAILY_RUN_CAP <= 0:
+        return _refused(
+            f"US {_esc(pid)} has not been searched, and this deployment will not "
+            "start a new one.",
+            "Reading 2,000 patents against every limitation of a claim costs about "
+            "thirty-four dollars of Gemini, and the hackathon credit that paid for "
+            "the runs on this site is spent. Rather than take the button away, it "
+            "refuses and says why. Everything already searched is open: the runs on "
+            "the home page, their claim charts, the accuracy page, and the letter "
+            "intake, which reads a real demand letter with Gemini and costs about a "
+            "cent.<br><br>To run this patent yourself against your own project, the "
+            "repository is at "
+            "<a href='https://github.com/JonathanSolvesProblems/nightshift'>"
+            "github.com/JonathanSolvesProblems/nightshift</a> and the command is "
+            f"<code>python -m priorart.orchestrate {_esc(pid)}</code>.",
+        )
+
     allowed, used = store.claim_daily_run(DAILY_RUN_CAP)
     if not allowed:
         return _refused(
             "Not starting another search today.",
-            f"This service starts at most {DAILY_RUN_CAP} searches a day, and "
+            f"This service starts at most {DAILY_RUN_CAP} new searches a day, and "
             f"{used} have run. Each one reads 2,000 patents with Gemini and costs "
             "about thirty-four dollars, so the ceiling is a real one rather than a "
             "throttle. The finished runs on the home page are open to read.",
