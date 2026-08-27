@@ -38,6 +38,12 @@ https://github.com/JonathanSolvesProblems/nightshift
 https://nightshift-1015687974010.us-central1.run.app
 ```
 
+## Demo video URL
+
+```
+
+```
+
 ## Built with
 
 ```
@@ -148,15 +154,29 @@ Further out, the thing this shape is actually for. IPR petition grounds under 35
 
 # NOTES, not for pasting
 
-- Elevator pitch is 195 characters. Leads with the human and the cost, not the
-  architecture. The word "troll" appears nowhere in any judged surface; the
+- Elevator pitch is 203 characters. It opens on what happens to the reader,
+  "most companies that get a patent demand letter settle without ever checking",
+  before naming the product, which is the shape Precedent used to win the Slack
+  challenge. An earlier version opened on the share of US patent cases filed by
+  non-practicing entities: a true fact about litigation rather than about the
+  person reading it. The word "troll" appears nowhere in any judged surface; the
   neutral term "non-practicing entity" is used instead, because the rules bar
   disparaging content.
-- The pitch says **ranks** 171,695 and **reads** 2,000, and those are different
+- The pitch says **reads 2,000**, never "reads 171,695". Those are different
   verbs on purpose. An earlier version said "reads 171,695 patents overnight",
   which the run page itself contradicts: it shows "read by Gemini: 2,000". The
   tagline is the one sentence most judges read, so it has to survive being
   checked against the screen.
+- **The hosted URL is the plain one, with no token.** The tester link
+  (`/tester?t=...`) is not published anywhere, because a token on a public
+  project page is not a token: anyone reading the page could start a $34 run,
+  and over a two-week judging window the daily cap still allows several hundred
+  dollars of it. The plain URL already shows every finished run, both claim
+  charts, the accuracy page and the live letter intake. Watching a run *start* is
+  what the video is for.
+- Cost figures were corrected on 26 August from $9.09 to $34.57 per run. The old
+  figure counted only `candidates_token_count` and missed `thoughts_token_count`,
+  which Vertex bills at the output rate. ACCURACY.md carries the derivation.
 - Every figure above is reproducible from the repo: accuracy from
   `python -m priorart.eval`, prefilter recall from `scripts/gate_recall.sql`,
   demo-case selection from `scripts/pick_demo_target.py`.
