@@ -618,18 +618,23 @@ def shell(title: str, sub: str, body: str, script: str = "") -> HTMLResponse:
     )
 
 
-def _run_budget_note() -> str:
+def _run_budget_note(runs: list[dict]) -> str:
     """Say up front what a press of the button will and will not do.
 
     A button that refuses is only honest if it says so before it is pressed
-    rather than after.
+    rather than after, and more useful still if it names the numbers that work.
     """
     if DAILY_RUN_CAP > 0:
         return ""
+
+    ready = sorted({str(r.get("target")) for r in runs if r.get("status") == "done"})
+    names = ", ".join(f"<b>{_esc(t)}</b>" for t in ready)
+    lead = (f"Already searched: {names}. Enter one of those and its finished run "
+            "opens straight away. ") if ready else ""
     return (
         "<div class=note style='margin-top:14px;border-top:1px solid var(--hairline);"
         "padding-top:14px'>"
-        "A patent already searched below opens its finished run straight away. "
+        + lead +
         "Starting a <em>new</em> search reads 2,000 patents with Gemini for about "
         "$34, and this public deployment will not spend that, so it refuses and "
         "explains rather than pretending the button is not there. Reading a letter "
@@ -640,13 +645,14 @@ def _run_budget_note() -> str:
 
 @app.get("/", response_class=HTMLResponse)
 def index():
+    recent = store.recent_runs(10)
     rows = "".join(
         f"<tr><td class='n num'><a href='/run/{r.get('run_id','')}'>"
         f"{r.get('run_id','')}</a></td>"
         f"<td>{(r.get('title') or '')[:52]}</td>"
         f"<td class='n num'>{r.get('candidates',0):,}</td>"
         f"<td class=n>{r.get('status','')}</td></tr>"
-        for r in store.recent_runs(10)
+        for r in recent
     )
     table = (
         "<div class=scroller><table>"
@@ -680,7 +686,7 @@ def index():
     limitation of claim 1. The work runs across {DEFAULT_TASKS} Cloud Run tasks.
     Close the tab; the run continues without you.
   </div>
-  {_run_budget_note()}
+  {_run_budget_note(recent)}
 </div>
 <div class=well><h2>Recent boreholes</h2>{table}</div>
 <div class=caveat>
@@ -789,7 +795,7 @@ def start(patent: str = Form(...), force: int = Form(0)):
         )
 
     if not force:
-        prior = store.completed_run_for(pid, DEFAULT_CANDIDATES)
+        prior = store.completed_run_for(pid)
         if prior:
             return _already_searched(pid, prior)
 

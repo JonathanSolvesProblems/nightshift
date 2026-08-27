@@ -163,19 +163,27 @@ def recent_runs(limit: int = 20) -> list[dict]:
     return rows[:limit]
 
 
-def completed_run_for(target: str, candidates: int) -> dict | None:
-    """The most recent finished run against this patent at this depth, if any.
+def completed_run_for(target: str, candidates: int = 0) -> dict | None:
+    """The deepest finished run against this patent, if there is one.
 
-    A run costs about nine dollars of Gemini and four minutes. When the same
-    question has already been answered, answering it again buys nothing, so the
-    web front end offers the finished run instead of launching a new one.
+    A run costs about thirty-four dollars of Gemini and four minutes, so when the
+    question has already been answered the web front end offers that answer
+    instead of launching another.
+
+    Deepest rather than most recent, and any depth rather than a minimum: an
+    earlier version required a run at least as deep as the current default, which
+    meant a patent searched to 400 candidates was treated as never searched at
+    all and the finished work was unreachable from the front page. Depth is
+    reported to the reader instead of used to hide the run.
     """
-    for r in recent_runs(40):
-        if (str(r.get("target")) == str(target)
-                and r.get("status") == "done"
-                and int(r.get("candidates") or 0) >= int(candidates)):
-            return r
-    return None
+    done = [
+        r for r in recent_runs(40)
+        if str(r.get("target")) == str(target) and r.get("status") == "done"
+    ]
+    if not done:
+        return None
+    return max(done, key=lambda r: (int(r.get("candidates") or 0),
+                                    r.get("created_at") or 0))
 
 
 def claim_daily_run(limit: int, kind: str = "run") -> tuple[bool, int]:
