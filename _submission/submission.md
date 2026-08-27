@@ -17,7 +17,7 @@ Nightshift
 ## Elevator pitch
 
 ```
-Non-practicing entities filed 55.4% of US patent cases last year. Nightshift ranks 171,695 patents, reads the 2,000 closest against every claim limitation, and hands your attorney the prior art that answers the letter, for $9.
+Non-practicing entities filed 55.4% of US patent cases last year. Nightshift ranks 171,695 patents, reads the 2,000 closest against every claim limitation, and hands your attorney the prior art that answers the letter, for $34.
 ```
 
 ## Category

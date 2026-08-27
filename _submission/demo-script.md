@@ -115,8 +115,8 @@ lighting up. Right: the actual Cloud Run Jobs console and Vertex AI logs.*
 
 ## 3:40 – 4:00 · Close.
 
-> A specialist billing by the hour over days or weeks, against one run and nine
-> dollars of Gemini.
+> A specialist billing by the hour over days or weeks, against one run and
+> thirty-four dollars of Gemini.
 >
 > It reports what a reference discloses. Whether the claim is invalid is still a
 > question for a lawyer. This is the evidence that lawyer starts from.

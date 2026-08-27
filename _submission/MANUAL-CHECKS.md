@@ -132,9 +132,9 @@ If you would rather not click, the terminal form is the same work:
 python -m priorart.orchestrate 10163121 --candidates 2000 --tasks 10
 ```
 
-Either way it is ~$9 and about four minutes of reading after placement. There is
-a cheaper version at `--candidates 500 --tasks 10` for about $2 if you only want
-to see the motion.
+Either way it is **~$34** and about four minutes of reading after placement.
+There is a cheaper version at `--candidates 500 --tasks 10` for about $10 if you
+only want to see the motion.
 
 **Do not run this more than you need to.** It is the main cost in the project.
 

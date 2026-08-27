@@ -113,9 +113,42 @@ independently surfaced that same reference.
 | Closest art | 39 |
 | **Depth of the examiner's reference** | **218 of 44,907** |
 | Wall time | ~4 minutes across 10 Cloud Run tasks |
-| Cost | **$9.09** |
+| Cost | **$34.57** |
 
 Against a professional prior-art search, billed by the hour over days or weeks.
+
+### How that cost figure was arrived at, and what it was before
+
+The service under-reported its own cost by about a factor of four until a billing
+alert caught it, and the correction is worth stating plainly because the number
+appears in the pitch.
+
+Cost is computed from Vertex AI list price for Gemini 3.5 Flash, $1.50 per
+million input tokens and $9.00 per million output. The token counts came from
+`usage_metadata.candidates_token_count`, which is the visible JSON the model
+returns. Gemini 3.5 Flash also thinks by default, reports those tokens separately
+as `thoughts_token_count`, and Vertex bills them at the **output** rate. Counting
+only the visible half put the demo run at $9.09 when it had actually cost $34.57.
+
+Two independent measurements agree on the corrected figure:
+
+- Screening 60 real candidates from this run's own candidate table with thinking
+  counted gives 2,288 input and 1,612 output tokens per call, which extrapolates
+  to **$35.87** for 2,000 candidates.
+- Reconciling against the billing console: total input tokens recorded across
+  every run to date (24.16M) sits close to the console's 27.05M, the remainder
+  being evaluation and charting. Dividing the console's output charge by the
+  visible output tokens recorded gives a ratio of 11.7, and applying it to this
+  run's own recorded tokens gives **$34.57**.
+
+`judge.screen` now adds `thoughts_token_count` into `tokens_out`, so runs from
+this point record what they actually cost. Runs recorded before the fix are
+understated in Firestore and the figures above supersede them.
+
+The cost is also now capped in the service itself. `/run` is public and
+unauthenticated, and a press of its main button spends about $34, so a patent
+already searched to this depth is answered from the finished run rather than
+searched again, and the number of new searches started per day has a ceiling.
 
 Depth 218 is beyond every shortlist a person is shown. A tool displaying the top
 50 misses it; so does one displaying the top 100. That is not an anecdote about

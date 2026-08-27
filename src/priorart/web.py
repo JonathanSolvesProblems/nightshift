@@ -49,6 +49,10 @@ app = FastAPI(title="Nightshift")
 
 DEFAULT_TASKS = int(os.environ.get("PRIOR_ART_TASKS", "10"))
 DEFAULT_CANDIDATES = int(os.environ.get("PRIOR_ART_CANDIDATES", "2000"))
+# A public button that spends about thirty-four dollars a press needs a ceiling
+# that does not depend on anyone behaving. Raise it from the environment for a
+# recording session, not in code.
+DAILY_RUN_CAP = int(os.environ.get("PRIOR_ART_DAILY_RUNS", "1"))
 
 FONTS = (
     "https://fonts.googleapis.com/css2?"
@@ -719,13 +723,20 @@ async def read_letter(letter: UploadFile = File(...)):
 
 
 @app.post("/run")
-def start(patent: str = Form(...)):
+def start(patent: str = Form(...), force: int = Form(0)):
     """Start a run, or explain in a sentence why it cannot start.
 
     Everything that can be known to be impossible is decided here, before a
     Cloud Run Job is launched. A patent with no claim text or outside the corpus
     produces a page, not a stack trace, and not a billed run that cannot find
     anything.
+
+    Two things also stop a run that is merely wasteful. A patent already searched
+    to this depth is answered from the finished run, because paying thirty-four
+    dollars and waiting four minutes to reproduce an answer that exists helps
+    nobody. And
+    the number of runs this service will start in a day is capped, because it is
+    public, unauthenticated, and its main button spends money.
     """
     pid = "".join(ch for ch in patent if ch.isdigit())
     if not pid:
@@ -734,6 +745,22 @@ def start(patent: str = Form(...)):
             "Enter the number from the demand letter, digits only. "
             "For example 10140422.",
         )
+
+    if not force:
+        prior = store.completed_run_for(pid, DEFAULT_CANDIDATES)
+        if prior:
+            return _already_searched(pid, prior)
+
+    allowed, used = store.claim_daily_run(DAILY_RUN_CAP)
+    if not allowed:
+        return _refused(
+            "Not starting another search today.",
+            f"This service starts at most {DAILY_RUN_CAP} searches a day, and "
+            f"{used} have run. Each one reads 2,000 patents with Gemini and costs "
+            "about thirty-four dollars, so the ceiling is a real one rather than a "
+            "throttle. The finished runs on the home page are open to read.",
+        )
+
     return StreamingResponse(
         _sink(pid),
         media_type="text/html; charset=utf-8",
@@ -792,6 +819,39 @@ def _sink(pid: str):
            f'<div class=note style="margin-top:16px">'
            f'<a href="/run/{run_id}">Open the core log</a></div></div>'
            f'<script>location.replace("/run/{run_id}")</script></body></html>')
+
+
+def _already_searched(pid: str, prior: dict) -> HTMLResponse:
+    """Hand back the finished run rather than paying to reproduce it."""
+    when = time.strftime("%Y-%m-%d %H:%M UTC",
+                         time.gmtime(prior.get("created_at") or 0))
+    rid = _esc(prior.get("run_id", ""))
+    return shell(
+        "Already searched",
+        f"US {_esc(pid)} &#183; {_esc(prior.get('title',''))}",
+        f"""
+<div class=well>
+  <h2>This one has been searched</h2>
+  <div class=note style="margin-bottom:14px">
+    US&nbsp;{_esc(pid)} was searched on {when}: {prior.get('candidates',0):,}
+    candidates read against every limitation of claim 1. That run is finished and
+    open to read.
+  </div>
+  <div class=note><a href="/run/{rid}">Open the core log</a></div>
+  <div class=note style="margin-top:18px">
+    Searching it again reads the same 2,000 patents with Gemini, takes about four
+    minutes, and costs about thirty-four dollars. It is the same corpus and the same
+    claim, so it will find the same art.
+  </div>
+  <form method=post action=/run style="margin-top:14px">
+    <input type=hidden name=patent value="{_esc(pid)}">
+    <input type=hidden name=force value="1">
+    <button type=submit>Search it again anyway</button>
+  </form>
+  <div class=note style="margin-top:16px"><a href="/">Search a different patent</a></div>
+</div>
+""",
+    )
 
 
 def _refusal(headline: str, detail: str) -> str:

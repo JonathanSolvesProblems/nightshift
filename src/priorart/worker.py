@@ -126,6 +126,8 @@ def main() -> int:
     )
 
     elapsed = time.time() - started
+    # Vertex AI list price for Gemini 3.5 Flash. tokens_out includes thinking,
+    # which Vertex bills at the output rate.
     cost = tokens_in / 1e6 * 1.50 + tokens_out / 1e6 * 9.00
     store.finish_shard(
         run_id,

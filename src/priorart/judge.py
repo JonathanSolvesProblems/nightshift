@@ -271,7 +271,16 @@ def screen(
         limitations_disclosed=addressed,
         summary=data.get("summary", ""),
         tokens_in=getattr(usage, "prompt_token_count", 0) or 0,
-        tokens_out=getattr(usage, "candidates_token_count", 0) or 0,
+        # Billed output is the answer plus the thinking that produced it.
+        #
+        # `candidates_token_count` is only the visible JSON. Gemini 3.5 Flash
+        # thinks by default and reports those tokens separately, but Vertex bills
+        # them at the output rate, and on this prompt they run about five times
+        # the visible answer. Counting only the visible half understated the cost
+        # of a run by roughly two and a half times, which was not discovered in
+        # the code but in a billing alert.
+        tokens_out=((getattr(usage, "candidates_token_count", 0) or 0)
+                    + (getattr(usage, "thoughts_token_count", 0) or 0)),
     )
 
 

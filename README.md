@@ -1,6 +1,6 @@
 # Nightshift
 
-**A patent demand letter takes a professional search and weeks to answer. Nightshift ranks 171,695 patents, reads the 2,000 closest against every claim limitation, and hands your attorney the answer for $9.**
+**A patent demand letter takes a professional search and weeks to answer. Nightshift ranks 171,695 patents, reads the 2,000 closest against every claim limitation, and hands your attorney the answer for $34.**
 
 Answering one question, was this already invented, means a prior-art search: a
 specialist, billed by the hour, over days or weeks. Most small companies never
@@ -133,7 +133,7 @@ that same reference:
 | Closest art | 39 |
 | **Depth of the examiner's reference** | **218** |
 | Wall time | ~4 minutes across 10 Cloud Run tasks |
-| Cost | **$9.09** |
+| Cost | **$34.57** |
 
 Against a professional search billed by the hour over days or weeks.
 

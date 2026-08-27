@@ -161,3 +161,47 @@ def recent_runs(limit: int = 20) -> list[dict]:
         return []
     rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
     return rows[:limit]
+
+
+def completed_run_for(target: str, candidates: int) -> dict | None:
+    """The most recent finished run against this patent at this depth, if any.
+
+    A run costs about nine dollars of Gemini and four minutes. When the same
+    question has already been answered, answering it again buys nothing, so the
+    web front end offers the finished run instead of launching a new one.
+    """
+    for r in recent_runs(40):
+        if (str(r.get("target")) == str(target)
+                and r.get("status") == "done"
+                and int(r.get("candidates") or 0) >= int(candidates)):
+            return r
+    return None
+
+
+def claim_daily_run(limit: int) -> tuple[bool, int]:
+    """Count one web-initiated run against today's cap. Returns (allowed, used).
+
+    The service is public and unauthenticated, and its main button spends real
+    money on Gemini. Without a ceiling, one crawler or one judge with a fast
+    finger can empty the account, and the first anyone would know is a billing
+    alert the next morning. The cap is transactional because Cloud Run serves
+    concurrent requests and two clicks landing together must not both pass.
+    """
+    day = time.strftime("%Y-%m-%d", time.gmtime())
+    ref = db().collection("meta").document("spend")
+
+    @firestore.transactional
+    def _claim(tx):
+        snap = ref.get(transaction=tx)
+        data = snap.to_dict() if snap.exists else {}
+        used = int(data.get("count", 0)) if data.get("day") == day else 0
+        if used >= limit:
+            return False, used
+        tx.set(ref, {"day": day, "count": used + 1, "at": time.time()})
+        return True, used + 1
+
+    try:
+        return _claim(db().transaction())
+    except Exception:  # noqa: BLE001
+        # A counter that cannot be read must not become a way to run for free.
+        return False, limit
