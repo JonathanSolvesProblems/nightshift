@@ -69,6 +69,31 @@ FONTS = (
     "family=Martian+Mono:wght@400;600&display=swap"
 )
 
+# The tab icon is the depth column, which is the one thing on this site a person
+# remembers: banded strata with a single bright seam cut across them. It is the
+# page's own argument at 16 pixels, not a letter N in a circle.
+#
+# The bands run cool at the top to warm at the bottom, matching bandFor() in the
+# page JS, so the icon reads as the same object as the column it stands for. The
+# seam sits low because that is the whole claim: the reference that matters is
+# deeper than anyone looks.
+#
+# Inline SVG in a data URI rather than an .ico file: no extra request on a page
+# a judge loads once, nothing to serve, and it stays sharp at every size.
+_FAVICON_SVG = (
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"
+    "<rect width='32' height='32' fill='%231D2220'/>"
+    "<rect x='10' y='3' width='12' height='7' fill='%236E8A86'/>"
+    "<rect x='10' y='10' width='12' height='7' fill='%238E7A5C'/>"
+    "<rect x='10' y='17' width='12' height='6' fill='%238A6440'/>"
+    "<rect x='10' y='23' width='12' height='6' fill='%237A4A2E'/>"
+    "<rect x='10' y='19' width='12' height='3' fill='%238CBF3F'/>"
+    "</svg>"
+)
+FAVICON = "data:image/svg+xml;utf8," + _FAVICON_SVG.replace("<", "%3C").replace(
+    ">", "%3E"
+).replace("'", "%27").replace(" ", "%20")
+
 CSS = """
 :root{
   --field:#262B29; --well:#1D2220; --raised:#2F3533; --hairline:#3A413E;
@@ -597,6 +622,7 @@ def head(title: str, sub: str) -> str:
         "<!doctype html><html lang=en><head><meta charset=utf-8>"
         '<meta name=viewport content="width=device-width,initial-scale=1">'
         f"<title>{title}</title>"
+        f'<link rel=icon href="{FAVICON}">'
         f'<link rel=preconnect href="https://fonts.gstatic.com" crossorigin>'
         f'<link rel=stylesheet href="{FONTS}">'
         f"<style>{CSS}</style></head><body>"
