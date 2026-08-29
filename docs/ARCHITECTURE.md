@@ -28,6 +28,12 @@ About 200x, from two changes: moving off the public tables, then clustering on
 
 ## Flow
 
+An editable version of this diagram is in `docs/architecture.drawio`, which opens
+in draw.io (diagrams.net) or the VS Code Draw.io extension. Export it to PNG or
+SVG from there. The mermaid version below renders inline on GitHub and says the
+same thing.
+
+
 ```mermaid
 flowchart TB
     U([Patent number from a demand letter]) --> W
