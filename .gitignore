@@ -18,3 +18,19 @@ venv/
 out/
 runs/
 *.log
+
+# Demo footage. Local only, never committed.
+#
+# Screen recordings run to hundreds of megabytes and the finished film lives on
+# YouTube, so nothing here belongs in the repository. The extensions are listed
+# as well as the folder, because the expensive mistake is a stray capture saved
+# somewhere else and committed by a `git add -A` at 2am on deadline night.
+broll/
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.wav
+*.aiff
+*.m4a
