@@ -128,6 +128,10 @@ header{border-bottom:2px solid var(--ink);padding-bottom:var(--s2);margin-bottom
 .mark{font-size:13px;letter-spacing:.34em;text-transform:uppercase;font-weight:600}
 .mark b{font-weight:600}
 .mark span{color:var(--ink3);font-weight:400}
+/* The wordmark is a link home, but it must not read as one: a masthead with an
+   underline under it looks like a mistake. It earns the accent on hover. */
+.mark a{color:inherit;border-bottom:0;display:inline-block}
+.mark a:hover span{color:var(--seam)}
 .sub{color:var(--ink2);font-size:13px;margin-top:var(--s1);max-width:66ch}
 
 /* the well: everything structural is milled into the field, never floated on it */
@@ -626,8 +630,12 @@ def head(title: str, sub: str) -> str:
         f'<link rel=preconnect href="https://fonts.gstatic.com" crossorigin>'
         f'<link rel=stylesheet href="{FONTS}">'
         f"<style>{CSS}</style></head><body>"
-        '<header><div class=mark><b>NIGHTSHIFT</b> '
-        "<span>&#183; prior-art core log</span></div>"
+        # The masthead is the way back, on every page. A run page is the link
+        # people share, and it had nothing on it pointing home at all, so anyone
+        # who arrived there directly was stranded with the browser back button
+        # and no idea the rest of the site existed.
+        '<header><div class=mark><a href="/"><b>NIGHTSHIFT</b> '
+        "<span>&#183; prior-art core log</span></a></div>"
         f"<div class=sub>{sub}</div></header>"
     )
 
@@ -868,17 +876,29 @@ def start(patent: str = Form(...), force: int = Form(0), token: str = Form("")):
             return _already_searched(pid, prior, token)
 
     if not _is_tester(token):
+        # Offer the finished work by name. A refusal that ends in "try another
+        # number" makes the reader guess which numbers work; one that lists them
+        # is a redirect rather than a wall.
+        done = sorted({str(r.get("target")) for r in store.recent_runs(10)
+                       if r.get("status") == "done"})
+        links = " &#183; ".join(
+            f"<a href='/run/{_esc(store.completed_run_for(t).get('run_id',''))}'>"
+            f"US {_esc(t)}</a>" for t in done
+        )
+        ready = (f"<br><br><b>Already searched, open now:</b> {links}"
+                 if links else "")
         return _refused(
             f"US {_esc(pid)} has not been searched, and this deployment will not "
             "start a new one.",
             "Reading 2,000 patents against every limitation of a claim costs about "
             "thirty-four dollars of Gemini, and the credit that paid for the runs on "
             "this site is spent, so starting one needs a tester link. Rather than "
-            "take the button away, it refuses and says why.<br><br>Everything already "
-            "searched is open without any link: the runs on the home page, their "
-            "claim charts, the accuracy page, and the letter intake, which reads a "
-            "real demand letter with Gemini and costs about a cent.<br><br>To run "
-            "this patent yourself against your own project, the "
+            "take the button away, it refuses and says why."
+            + ready +
+            "<br><br>Everything already searched is open without any link: those "
+            "runs, their claim charts, the accuracy page, and the letter intake, "
+            "which reads a real demand letter with Gemini and costs about a cent."
+            "<br><br>To run this patent yourself against your own project, the "
             "repository is at "
             "<a href='https://github.com/JonathanSolvesProblems/nightshift'>"
             "github.com/JonathanSolvesProblems/nightshift</a> and the command is "
