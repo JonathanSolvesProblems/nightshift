@@ -441,10 +441,14 @@ async function tick(){
     ? drawn.length + " strongest of " + strong.length + " marked, thickness by limitations matched"
     : (strong.length ? strong.length + " marked, thickness by limitations matched" : "");
 
+  if(firstTick && over && (run.screened || 0) > 0) replaying = true;
+  firstTick = false;
   feed(d.shards, run.findings || 0, tasksTotal);
   const note = document.getElementById("flownote");
   if(note) note.textContent = reduce
     ? "motion disabled by your system settings"
+    : (replaying && parts.length)
+      ? "replaying the " + n(run.screened) + " candidates this run already read"
     : over
       ? "run complete, " + n(run.screened) + " candidates read across " +
         (d.shards.length || 0) + " tasks"
@@ -520,6 +524,13 @@ const cv = document.getElementById("flow");
 const cx = cv ? cv.getContext("2d") : null;
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let parts = [], lanes = 1, prevScreened = {}, prevFound = 0, seen = 0, running = false;
+/* Opening a FINISHED run replays it: the first poll sees the whole screened
+   count as one delta and emits the backlog in a burst. That is worth keeping,
+   because a still canvas tells a reader nothing about the shape of the run,
+   but it must be labelled. Motion under a caption reading "run complete"
+   invites the reader to believe work is happening now, which is the exact
+   lie this canvas was built to avoid. */
+let firstTick = true, replaying = false;
 const CSSVAR = k => getComputedStyle(document.body).getPropertyValue(k).trim();
 
 function fit(){
@@ -608,7 +619,7 @@ function draw(){
   parts = parts.filter(p => p.x <= w - pad*2);
 
   if(alive){ requestAnimationFrame(draw); }
-  else { running = false; rest(); }
+  else { running = false; replaying = false; rest(); }
 }
 
 fit();
