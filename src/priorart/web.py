@@ -792,6 +792,11 @@ async def read_letter(letter: UploadFile = File(...), token: str = Form("")):
     The first step of this job was always manual: a person reads the letter,
     finds the number, strips the commas, types it in. Gemini reads the document
     directly, so a phone photograph of a page works the same as a PDF.
+
+    Streamed, because the vision call takes about five seconds and a form post
+    that returns nothing for five seconds reads as a broken button. The upload is
+    read here, inside the async handler, and only the model call is deferred to
+    the generator.
     """
     raw = await letter.read()
     if not raw:
@@ -811,21 +816,55 @@ async def read_letter(letter: UploadFile = File(...), token: str = Form("")):
             "number directly.",
         )
 
-    mime = letter.content_type or "application/pdf"
+    return StreamingResponse(
+        _read_letter_stream(raw, letter.content_type or "application/pdf",
+                            letter.filename or "the upload", token),
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
+
+
+def _read_letter_stream(raw: bytes, mime: str, filename: str, token: str):
+    """Write the reading of a letter out to the browser as it happens.
+
+    The steps stay on the page after the answer arrives rather than being
+    cleared. They are the provenance of the number: a reader can see that the
+    document went to the model and the model came back with it, which is the
+    whole claim being made on this screen.
+    """
+    kb = len(raw) / 1024
+    kind = "PDF" if "pdf" in mime.lower() else "image"
+
+    yield head("Reading the letter", "Read from the letter by Gemini")
+    yield "<div class=well><h2>Reading the letter</h2><ol class=steps>"
+    yield f"<li class=fact>{_esc(filename)}, {kind}, {kb:,.0f} KB</li>"
+    yield ("<li class=step>sending the document to Gemini and asking what patent "
+           "is being asserted</li>")
+
     try:
         found = judge.read_demand_letter(raw, mime)
     except Exception as exc:  # noqa: BLE001
-        return _refused("Could not read that file.", _esc(str(exc)[:180]))
+        yield ("</ol></div>"
+               + _refusal("Could not read that file.", _esc(str(exc)[:180]))
+               + "</body></html>")
+        return
 
     patents = [p for p in found.get("patents", []) if p.get("number")]
     if not found.get("is_assertion") or not patents:
-        return _refused(
+        yield "<li class=fact>Gemini read it and found no patent being asserted</li></ol></div>"
+        yield (_refusal(
             "No asserted patent found in that document.",
             "Nightshift looks for a US patent number the sender is asserting "
-            "against you. If you know the number, enter it directly.",
-        )
+            "against you. A document can be full of patent numbers and still not "
+            "be a demand letter, which is the distinction being made here. If you "
+            "know the number, enter it directly.")
+            + "</body></html>")
+        return
 
     sender = _esc(found.get("sender") or "the sender")
+    yield (f"<li class=fact>Gemini read it: {len(patents)} patent"
+           f"{'' if len(patents) == 1 else 's'} asserted by {sender}</li></ol></div>")
+
     rows = "".join(
         f"<tr><td class='n num'>US {_esc(p['number'])}</td>"
         f"<td>{_esc(p.get('context',''))[:150]}</td>"
@@ -836,10 +875,7 @@ async def read_letter(letter: UploadFile = File(...), token: str = Form("")):
         for p in patents[:6]
     )
 
-    return shell(
-        "Nightshift",
-        "Read from the letter by Gemini",
-        f"""
+    yield f"""
 <div class=well>
   <h2>Asserted against you</h2>
   <div class=note style="margin-bottom:14px">
@@ -853,8 +889,8 @@ async def read_letter(letter: UploadFile = File(...), token: str = Form("")):
   </table></div>
 </div>
 <div class=note><a href="/">Enter a number instead</a></div>
-""",
-    )
+</body></html>
+"""
 
 
 @app.post("/run")
