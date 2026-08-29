@@ -1023,10 +1023,35 @@ def _sink(pid: str):
 
 
 def _already_searched(pid: str, prior: dict, token: str = "") -> HTMLResponse:
-    """Hand back the finished run rather than paying to reproduce it."""
+    """Hand back the finished run rather than paying to reproduce it.
+
+    Whether the re-search button will actually work has to be stated here, not
+    discovered by pressing it. Without a token this page and a refusal look the
+    same, and the honest difference between "there is a finished answer, read it"
+    and "this link cannot spend" is the whole point of having both.
+    """
     when = time.strftime("%Y-%m-%d %H:%M UTC",
                          time.gmtime(prior.get("created_at") or 0))
     rid = _esc(prior.get("run_id", ""))
+    if _is_tester(token):
+        again = (
+            "<div class=note style='margin-top:18px'>You are on the tester link, so "
+            "the button below <b>will</b> start a new run: the same 2,000 patents "
+            "read again by Gemini, about four minutes, about <b>$34</b> of real "
+            "money. Same corpus and same claim, so it will find the same art.</div>"
+            f"""<form method=post action=/run style="margin-top:14px">
+    <input type=hidden name=patent value="{_esc(pid)}">
+    <input type=hidden name=force value="1">{_tok_field(token)}
+    <button type=submit>Search it again anyway</button>
+  </form>"""
+        )
+    else:
+        again = (
+            "<div class=note style='margin-top:18px'>Searching it again would read "
+            "the same 2,000 patents with Gemini for about $34, and this link cannot "
+            "spend that, so there is no button for it here. The finished run above "
+            "is the same answer.</div>"
+        )
     return shell(
         "Already searched",
         f"US {_esc(pid)} &#183; {_esc(prior.get('title',''))}",
@@ -1039,16 +1064,7 @@ def _already_searched(pid: str, prior: dict, token: str = "") -> HTMLResponse:
     open to read.
   </div>
   <div class=note><a href="/run/{rid}">Open the core log</a></div>
-  <div class=note style="margin-top:18px">
-    Searching it again reads the same 2,000 patents with Gemini, takes about four
-    minutes, and costs about thirty-four dollars. It is the same corpus and the same
-    claim, so it will find the same art.
-  </div>
-  <form method=post action=/run style="margin-top:14px">
-    <input type=hidden name=patent value="{_esc(pid)}">
-    <input type=hidden name=force value="1">{_tok_field(token)}
-    <button type=submit>Search it again anyway</button>
-  </form>
+  {again}
   <div class=note style="margin-top:16px"><a href="/">Search a different patent</a></div>
 </div>
 """,
