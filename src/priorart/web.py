@@ -441,6 +441,8 @@ async function tick(){
     ? drawn.length + " strongest of " + strong.length + " marked, thickness by limitations matched"
     : (strong.length ? strong.length + " marked, thickness by limitations matched" : "");
 
+  doneNote = "run complete, " + n(run.screened) + " candidates read across " +
+             (d.shards.length || 0) + " tasks";
   if(firstTick && over && (run.screened || 0) > 0) replaying = true;
   firstTick = false;
   feed(d.shards, run.findings || 0, tasksTotal);
@@ -450,8 +452,7 @@ async function tick(){
     : (replaying && parts.length)
       ? "replaying the " + n(run.screened) + " candidates this run already read"
     : over
-      ? "run complete, " + n(run.screened) + " candidates read across " +
-        (d.shards.length || 0) + " tasks"
+      ? doneNote
       : reading
         ? "one mark per four candidates read, one bright mark per finding"
         : tasksTotal
@@ -501,6 +502,9 @@ async function tick(){
     `<td>${esc((f.summary||"").slice(0,150))}</td></tr>`
   ).join("");
 
+  // One more tick lands after completion so the final counts paint, then stop.
+  if(over) stopPolling();
+
   const chart = document.getElementById("chartlink");
   if(chart) chart.style.display = (run.strong > 0) ? "inline" : "none";
 }
@@ -530,7 +534,7 @@ let parts = [], lanes = 1, prevScreened = {}, prevFound = 0, seen = 0, running =
    but it must be labelled. Motion under a caption reading "run complete"
    invites the reader to believe work is happening now, which is the exact
    lie this canvas was built to avoid. */
-let firstTick = true, replaying = false;
+let firstTick = true, replaying = false, doneNote = "";
 const CSSVAR = k => getComputedStyle(document.body).getPropertyValue(k).trim();
 
 function fit(){
@@ -619,11 +623,31 @@ function draw(){
   parts = parts.filter(p => p.x <= w - pad*2);
 
   if(alive){ requestAnimationFrame(draw); }
-  else { running = false; replaying = false; rest(); }
+  else {
+    running = false;
+    if(replaying){
+      replaying = false;
+      const note = document.getElementById("flownote");
+      if(note && doneNote) note.textContent = doneNote;
+    }
+    rest();
+  }
 }
 
 fit();
-tick(); setInterval(tick, 2000);
+/* Poll only while there is something left to learn.
+ *
+ * A finished run does not change, and this page used to poll it every two
+ * seconds forever: about 1,300 Firestore document reads a tick, 39,000 a
+ * minute, for as long as a tab stayed open. A judge who opens the demo and
+ * walks away for the afternoon was the single largest cost this service could
+ * incur, and it bought nothing.
+ *
+ * The replay animation is driven by requestAnimationFrame off data already
+ * fetched, so stopping the poll does not stop the motion. */
+let poller = setInterval(tick, 2000);
+tick();
+function stopPolling(){ if(poller){ clearInterval(poller); poller = null; } }
 """
 
 
@@ -1150,8 +1174,19 @@ def _execution_state(name: str) -> str:
     return phrase
 
 
+_DONE_CACHE: dict[str, dict] = {}
+
+
 @app.get("/api/run/{run_id}")
 def api_run(run_id: str):
+    # A finished run is immutable, so it is read from Firestore once per
+    # container and served from memory after that. Belt to the client-side
+    # braces: this holds even against something that ignores the page and polls
+    # the endpoint directly.
+    cached = _DONE_CACHE.get(run_id)
+    if cached is not None:
+        return JSONResponse(cached)
+
     run = store.get_run(run_id)
     if not run:
         return JSONResponse({"error": "not found"}, status_code=404)
@@ -1176,7 +1211,10 @@ def api_run(run_id: str):
     run["closest"] = sum(1 for f in all_findings if (f.get("relevance") or 0) >= 3)
     run["strong"] = sum(1 for f in all_findings if (f.get("relevance") or 0) == 2)
     run["partial"] = run["findings"] - run["closest"] - run["strong"]
-    return JSONResponse({"run": run, "shards": shards, "findings": all_findings[:80]})
+    payload = {"run": run, "shards": shards, "findings": all_findings[:80]}
+    if run.get("status") == "done":
+        _DONE_CACHE[run_id] = payload
+    return JSONResponse(payload)
 
 
 @app.get("/run/{run_id}", response_class=HTMLResponse)
