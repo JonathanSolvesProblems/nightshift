@@ -37,7 +37,7 @@ import time
 
 from google.cloud import run_v2
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -660,6 +660,11 @@ def shell(title: str, sub: str, body: str, script: str = "") -> HTMLResponse:
     )
 
 
+def _token_of(request: Request, form_token: str = "") -> str:
+    """The tester token for this request, from the form or the cookie."""
+    return form_token or request.cookies.get("ns_tester", "")
+
+
 def _is_tester(token: str) -> bool:
     """Whether this request carries the key that is allowed to spend money.
 
@@ -715,8 +720,8 @@ def _run_budget_note(runs: list[dict], token: str = "") -> str:
 
 
 @app.get("/", response_class=HTMLResponse)
-def index():
-    return _home("")
+def index(request: Request):
+    return _home(_token_of(request))
 
 
 @app.get("/tester", response_class=HTMLResponse)
@@ -726,8 +731,19 @@ def tester(t: str = ""):
     Handed to judges. Everything on it is what a visitor to `/` sees; the only
     difference is that the search button will actually start a run, which is the
     one action on this service that costs real money.
+
+    The token is also set as a cookie, because a token that only lives in the
+    query string is lost by the first ordinary click. Following the masthead
+    home, opening a finished run, or using "search a different patent" all
+    dropped it, so the site would silently stop being able to spend halfway
+    through a session and look broken rather than gated.
     """
-    return _home(t if _is_tester(t) else "")
+    ok = _is_tester(t)
+    resp = _home(t if ok else "")
+    if ok:
+        resp.set_cookie("ns_tester", t, max_age=12 * 3600, httponly=True,
+                        samesite="lax", secure=True)
+    return resp
 
 
 def _home(token: str):
@@ -786,7 +802,8 @@ def _home(token: str):
 
 
 @app.post("/read-letter", response_class=HTMLResponse)
-async def read_letter(letter: UploadFile = File(...), token: str = Form("")):
+async def read_letter(request: Request, letter: UploadFile = File(...),
+                      token: str = Form("")):
     """Take the letter itself and find the asserted patent in it.
 
     The first step of this job was always manual: a person reads the letter,
@@ -798,6 +815,7 @@ async def read_letter(letter: UploadFile = File(...), token: str = Form("")):
     read here, inside the async handler, and only the model call is deferred to
     the generator.
     """
+    token = _token_of(request, token)
     raw = await letter.read()
     if not raw:
         return _refused("That file was empty.", "Try the PDF or a photo of the letter.")
@@ -894,7 +912,8 @@ def _read_letter_stream(raw: bytes, mime: str, filename: str, token: str):
 
 
 @app.post("/run")
-def start(patent: str = Form(...), force: int = Form(0), token: str = Form("")):
+def start(request: Request, patent: str = Form(...), force: int = Form(0),
+          token: str = Form("")):
     """Start a run, or explain in a sentence why it cannot start.
 
     Everything that can be known to be impossible is decided here, before a
@@ -909,6 +928,7 @@ def start(patent: str = Form(...), force: int = Form(0), token: str = Form("")):
     the number of runs this service will start in a day is capped, because it is
     public, unauthenticated, and its main button spends money.
     """
+    token = _token_of(request, token)
     pid = "".join(ch for ch in patent if ch.isdigit())
     if not pid:
         return _refused(
