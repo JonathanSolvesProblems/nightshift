@@ -65,8 +65,10 @@ tasks going from Running to Succeeded. Then the Vertex AI logs.*
 
 ## 1:20 – 1:55 · Why it is built this way. This is the 30% architecture block.
 
-*The architecture diagram, held on screen. Export `docs/architecture.drawio`
-to PNG at 2x and hold it still; do not pan around it.*
+*The architecture diagram, held on screen. **Export it first.** File, Export as,
+PNG, 2x, transparent off, with a border. Record the exported image full screen,
+not the draw.io editor: the shape palette and format panel are forty percent of
+that frame and none of it is the diagram. Hold it still, do not pan.*
 
 > Four decisions worth defending.
 >
