@@ -11,6 +11,8 @@ the background.
 
 **Live: https://nightshift-1015687974010.us-central1.run.app**
 
+**Write-up: https://jonathanandrei.com/blog/nightshift-agentic-prior-art-search/**
+
 Built for the All Things Agentic Hackathon, track: **The Taskmaster**.
 
 > **PRIOR ART EVIDENCE DOSSIER, NOT A LEGAL OPINION.**
