@@ -1,39 +1,28 @@
 # Demo script, 4:00
 
-## Read this straight through
+## The narration
 
-Everything below the line is reference. This is the whole narration, in order,
-written to be read aloud in one pass. Italic lines are cues for the edit and are
-not spoken. Aim for a normal presenting pace, around 160 words a minute.
-
-*Letter on a desk.*
+Read this straight through. Nothing here is a note to you; every word is
+spoken. About three minutes forty-five at a normal presenting pace.
 
 A company gets a letter saying it infringes a patent. The first real question is
 whether somebody had already invented the thing. Most of them never find out,
 because finding out means a prior-art search: a specialist, billed by the hour,
 over days or weeks. So they settle, because looking costs more than folding.
 
-*Upload the letter. The steps write themselves.*
-
 So I hand Nightshift the letter. Not the patent number, the letter. Gemini reads
 the document and decides three things: whether this is an assertion at all, which
 patent, and who is asserting it. Merrow and Vance Holdings, US ten one six three
 one two one. I have not typed anything.
-
-*Click through. The sinking page writes itself, live.*
 
 One click, and nothing after it is guided. It splits claim one into seven
 limitations, works out the priority date, and drops a hundred and twenty-six
 thousand patents that cannot legally be prior art. Forty-four thousand nine
 hundred survive. It launches ten Cloud Run tasks and starts reading.
 
-*Cloud Run Jobs console, tasks executing. Then the Vertex AI logs.*
-
 That is the job executing on Google Cloud. Ten tasks, each pulling its own shard
 from BigQuery, each calling Gemini once per candidate. It is a background job, so
 I can close the tab and the work carries on.
-
-*Hold on the architecture diagram.*
 
 Four decisions worth defending. The expensive work happens once: one lookup
 against the public patent tables scans a thousand and fifty-two gigabytes, so the
@@ -44,11 +33,7 @@ no task talks to another, and whichever finishes last sees every shard is done
 and closes the run. And it refuses before it spends: a patent with no claim text
 gets a sentence, not a billed run that cannot find anything.
 
-*Four minutes later. The finished run.*
-
 Four minutes later. Two thousand read, and a shortlist marked as closest.
-
-*First claim chart, scrolled slowly.*
 
 Here is one. US seven six oh six seven three oh, filed four years before the
 priority date. The claim calls itself targeted marketing; the reference calls
@@ -56,8 +41,6 @@ itself a stored value card. They share almost no vocabulary, and both describe
 accumulating loyalty value and redeeming it at a point of sale, which is exactly why
 a keyword search does not find it. Every limitation is mapped, the passage quoted
 word for word, and where the reference teaches nothing it says so.
-
-*Second chart. Hold here.*
 
 A USPTO examiner applied that exact reference against that exact patent, and
 Nightshift found it without ever seeing the file history. So the method works.
@@ -67,8 +50,6 @@ teaches more of this claim than the reference the examiner used. Depth eleven
 twenty-nine. Nothing that hands a person a shortlist of fifty was ever going to
 reach it.
 
-*The accuracy page.*
-
 The accuracy number is not mine either. The USPTO publishes which references an
 examiner applied in a rejection, so the test is to hide the file history, search
 blind, and see whether it re-finds what the examiner used. Ninety seven and a
@@ -77,14 +58,29 @@ of the ones the examiner never cited, which is what makes the first number mean
 anything. And the reference you just saw scores as a miss against me. I would
 rather report it that way than move the goalposts.
 
-*Repo, live URL, run id on screen.*
-
 A specialist billing by the hour over days, against one run, four minutes, and
 thirty-four dollars of Gemini. It reports what a reference discloses. Whether the
 claim is invalid is a question for a lawyer. This is the evidence that lawyer
 starts from.
 
 ---
+
+## What is on screen for each paragraph
+
+Paragraphs in the order they appear above.
+
+| # | On screen |
+|---|---|
+| 1 | Letter on a desk. |
+| 2 | Upload the letter. The steps write themselves. |
+| 3 | Click through. The sinking page writes itself, live. |
+| 4 | Cloud Run Jobs console, tasks executing. Then the Vertex AI logs. |
+| 5 | Hold on the architecture diagram. |
+| 6 | Four minutes later. The finished run. |
+| 7 | First claim chart, scrolled slowly. |
+| 8 | Second chart. Hold here. |
+| 9 | The accuracy page. |
+| 10 | Repo, live URL, run id on screen. |
 
 Written against the published criteria, which are weighted and specific:
 
