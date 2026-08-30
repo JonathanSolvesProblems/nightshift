@@ -34,3 +34,8 @@ broll/
 *.wav
 *.aiff
 *.m4a
+
+# Submission working files and preview images. These are Devpost form content
+# and screenshots, not part of the project a judge clones.
+_submission/
+preview/
