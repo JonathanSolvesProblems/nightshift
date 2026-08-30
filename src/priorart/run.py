@@ -3,8 +3,8 @@
     python -m priorart.run 7240025 --candidates 200
 
 Local runner. The deployed version distributes the screening stage across Cloud
-Run Jobs via Pub/Sub, using the same `screen` unit of work so the two paths
-cannot drift apart.
+Run Jobs, each task claiming a modulo slice of the candidate table, using the
+same `screen` unit of work so the two paths cannot drift apart.
 """
 
 from __future__ import annotations

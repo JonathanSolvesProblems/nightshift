@@ -294,7 +294,7 @@ def screen_all(
     """Fan out screening across candidates.
 
     Local threads here; the deployed version distributes the same unit of work
-    across Cloud Run Jobs via Pub/Sub. The unit is deliberately identical so the
+    across Cloud Run Jobs. The unit is deliberately identical so the
     two paths cannot drift.
     """
     gc = client()

@@ -237,7 +237,7 @@ demand letter
   -> target patent + claim limitations
   -> priority-date gate        (references must predate the target)
   -> vector prefilter          BigQuery, 171,695 -> candidates
-  -> Gemini judgment fan-out   Cloud Run Jobs + Pub/Sub, thousands of candidates
+  -> Gemini judgment fan-out   Cloud Run Jobs, 10 tasks, thousands of candidates
   -> claim chart               limitation-by-limitation, with pin cites
 ```
 
@@ -246,7 +246,7 @@ demand letter
 | Corpus and prefilter | BigQuery |
 | Model | Gemini 3.5 Flash |
 | Fan-out workers | Cloud Run Jobs |
-| Work distribution | Pub/Sub |
+| Work distribution | Cloud Run task index, `MOD(rank, TASK_COUNT) = TASK_INDEX` |
 | Run state | Firestore |
 
 ## Spin-up

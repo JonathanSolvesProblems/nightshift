@@ -8,7 +8,6 @@ google-genai>=1.0.0
 google-cloud-firestore==2.29.0
 google-api-core==2.34.0
 
-google-cloud-pubsub>=2.21.0
 google-cloud-run>=0.10.0
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
