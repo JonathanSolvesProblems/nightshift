@@ -7,6 +7,8 @@ specialist, billed by the hour, over days or weeks. Most small companies never
 ask, because asking costs more than settling. Nightshift asks, autonomously, in
 the background.
 
+**Demo video (4 min): https://www.youtube.com/watch?v=m0k530DiYTg**
+
 **Live: https://nightshift-1015687974010.us-central1.run.app**
 
 Built for the All Things Agentic Hackathon, track: **The Taskmaster**.
