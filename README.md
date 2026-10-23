@@ -9,11 +9,18 @@ the background.
 
 **Demo video (4 min): https://www.youtube.com/watch?v=m0k530DiYTg**
 
-**Live: https://nightshift-1015687974010.us-central1.run.app**
-
 **Write-up: https://jonathanandrei.com/blog/nightshift-agentic-prior-art-search/**
 
 Built for the All Things Agentic Hackathon, track: **The Taskmaster**.
+
+> **Archived.** The hackathon is over and the Google Cloud deployment was shut
+> down on 23 October 2026, so the old live URL no longer resolves. The demo video
+> above shows it running. Screenshots of every page are in [`docs/shots/`](docs/shots/):
+> the [demo run](docs/shots/demo-run-light.png), the
+> [examiner's reference](docs/shots/demo-chart-light.png), the
+> [reference the examiner missed](docs/shots/demo-chart-missed-light.png) and the
+> [accuracy page](docs/shots/eval-light.png). Everything can be rebuilt from
+> [Spin-up](#spin-up) below. This repository is not maintained.
 
 > **PRIOR ART EVIDENCE DOSSIER, NOT A LEGAL OPINION.**
 > Nightshift produces evidence for review by licensed patent counsel. It reports
@@ -165,7 +172,7 @@ the examiner **missed** is the product, and this run did.
 | US 7,606,730, the reference the examiner applied | 218 | 2 | 5 | 0 |
 | **US 6,564,189** | **1,129** | **6** | **0** | 1 |
 
-[US 6,564,189](https://nightshift-1015687974010.us-central1.run.app/chart/10163121-c398c4bc?ref=6564189),
+[US 6,564,189](docs/shots/demo-chart-missed-light.png),
 "Universal methods and apparatus for determining prices and rewards within retail
 transactions", was filed **1998-12-22**, nearly eight years before this patent's
 priority date. It is unambiguously eligible prior art, it appears **nowhere** in

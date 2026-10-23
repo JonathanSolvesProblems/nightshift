@@ -182,7 +182,7 @@ this patent's priority date. It is unambiguously eligible prior art, it appears
 **nowhere** in the examiner's citations for this application, and it teaches six
 of the seven limitations outright where the examiner's own reference teaches two.
 
-Reproduce: [`/chart/10163121-c398c4bc?ref=6564189`](https://nightshift-1015687974010.us-central1.run.app/chart/10163121-c398c4bc?ref=6564189).
+Chart: [`docs/shots/demo-chart-missed-light.png`](docs/shots/demo-chart-missed-light.png) (run `10163121-c398c4bc`; the hosted deployment was shut down on 23 October 2026).
 
 Two things follow.
 

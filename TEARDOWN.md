@@ -1,5 +1,13 @@
 # Teardown
 
+**Done 23 October 2026, eleven days after the date below.** Cloud Run service
+and job, the BigQuery dataset, both Artifact Registry repositories, both Cloud
+Storage buckets and both Firestore databases deleted; the user-managed
+service-account key revoked; billing unlinked from the project. The URL returns
+404 from outside. `scripts/teardown.py` could not read BigQuery or Firestore at
+that point (no Application Default Credentials) and printed an empty inventory
+for both, so the sweep was redone with `gcloud` and `bq` directly.
+
 **Run `python scripts/teardown.py --destroy` on or after 12 October 2026.**
 
 That date is the whole point of this file. The hackathon publishes a submission
